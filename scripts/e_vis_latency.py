@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import cm
 
-# — your original helpers —
+# — original helpers —
 def add_latency_numeric(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['latency_numeric'] = df.apply(
@@ -99,9 +99,12 @@ def plot_latency_burst_size(
     cycle_id=None,
     model=None
 ):
-    df = dfs.get('latency')
-    if df is None:
-        print("latency DataFrame not found in dfs.")
+    if isinstance(dfs, dict):
+        df = dfs.get('latency')
+    elif isinstance(dfs, pd.DataFrame):
+        df = dfs
+    else:
+        print("Invalid input: dfs should be a DataFrame or a dictionary.")
         return
 
     # filter cycle and models
@@ -218,9 +221,12 @@ def plot_latency_burst_interval(
     cycle_id=None,
     model=None
 ):
-    df = dfs.get('latency')
-    if df is None:
-        print("latency DataFrame not found in dfs.")
+    if isinstance(dfs, dict):
+        df = dfs.get('latency')
+    elif isinstance(dfs, pd.DataFrame):
+        df = dfs
+    else:
+        print("Invalid input: dfs should be a DataFrame or a dictionary.")
         return
 
     # filter cycle and models

@@ -1,10 +1,19 @@
 from typing import List, Dict
 import pandas as pd
 
+import pandas as pd
+from typing import List
+
 def get_descriptive_stats(df: pd.DataFrame, models: List[str] = None):
     """
     Compute and print descriptive statistics on the MEAN energy_per_token_kwh per configuration
-    for each model, including max/min scenarios, normalized measures, variability, and distribution metrics.
+    for each model, including:
+      - max/min scenarios
+      - % range relative to mean
+      - % range relative to min baseline
+      - % energy reduction from worst to best
+      - variability & distribution metrics
+    Then repeat all “range” stats with outliers removed (1.5×IQR method).
     """
     available_models = df['model'].unique()
     models = [m for m in (models or available_models) if m in available_models]
@@ -17,60 +26,76 @@ def get_descriptive_stats(df: pd.DataFrame, models: List[str] = None):
             print(f"No data for model {model}, skipping.")
             continue
 
-        # Aggregate to mean per configuration
-        grouped = (
-            model_df
-            .groupby('config_name')['energy_per_token_kwh']
-            .mean()
-            .reset_index(name='mean_energy')
-        )
+        def summarize(sub_df: pd.DataFrame, label: str):
+            # 1) aggregate to mean per config
+            grouped = (
+                sub_df
+                .groupby('config_name')['energy_per_token_kwh']
+                .mean()
+                .reset_index(name='mean_energy')
+            )
 
-        # Identify max and min mean scenarios
-        idx_max = grouped['mean_energy'].idxmax()
-        idx_min = grouped['mean_energy'].idxmin()
-        max_row = grouped.loc[idx_max]
-        min_row = grouped.loc[idx_min]
-        max_val = max_row['mean_energy']
-        min_val = min_row['mean_energy']
+            # 2) max/min
+            idx_max = grouped['mean_energy'].idxmax()
+            idx_min = grouped['mean_energy'].idxmin()
+            max_val = grouped.loc[idx_max, 'mean_energy']
+            min_val = grouped.loc[idx_min, 'mean_energy']
 
-        print(f"\nModel: {model}\n")
-        print(f"    - Config w/ MAX Mean Energy: {max_row['config_name']} ({max_val:.4f} kWh)")
-        print(f"    - Config w/ MIN Mean Energy: {min_row['config_name']} ({min_val:.4f} kWh)")
+            # 3) percent energy reduction baseline→best
+            pct_reduction = (max_val - min_val) / max_val
 
-        # Range relative to overall mean of means
-        overall_mean = grouped['mean_energy'].mean()
-        value_range = max_val - min_val
-        print(f'\n ==Standard normalisation (relative to mean):==')
-        print(f"    - Energy range is {(value_range/overall_mean):.2%} of the MEAN of config means.")
+            # 4) relative to mean of means
+            overall_mean = grouped['mean_energy'].mean()
+            range_rel_mean = (max_val - min_val) / overall_mean
 
-        # Normalize to baseline (min mean configuration)
-        grouped['norm_to_min'] = grouped['mean_energy'] / min_val
-        grouped['diff_to_min_pct'] = (grouped['mean_energy'] - min_val) / min_val
-        print("\n ==Normalized to baseline (min mean config):==")
-        print(f"    - Energy range is {(value_range/min_val):.2%} of the MIN of config means.")
-        print(grouped[['config_name', 'norm_to_min', 'diff_to_min_pct']])
+            # 5) normalized to min baseline
+            range_rel_min = (max_val - min_val) / min_val
+            grouped['norm_to_min'] = grouped['mean_energy'] / min_val
+            grouped['diff_to_min_pct'] = (grouped['mean_energy'] - min_val) / min_val
 
-        # Variability measures on config means
-        std_means = grouped['mean_energy'].std()
-        cv = std_means / overall_mean
-        print(f"\nCoefficient of variation of config means: {cv:.2%}")
-        print(f"Standard deviation of config means: {std_means:.4f} kWh ({std_means/overall_mean:.2%} of mean).")
+            print(f"\n--- {model} ({label}) ---")
+            print(f"Max mean energy: {max_val:.4f} kWh @ {grouped.loc[idx_max, 'config_name']}")
+            print(f"Min mean energy: {min_val:.4f} kWh @ {grouped.loc[idx_min, 'config_name']}")
+            print(f"- Energy reduction (worst→best): {pct_reduction:.2%}")
+            print(f"- Range vs. mean of means: {range_rel_mean:.2%}")
+            print(f"- Range vs. min baseline: {range_rel_min:.2%}")
+            print("\nNormalized to min baseline:")
+            print(grouped[['config_name', 'norm_to_min', 'diff_to_min_pct']].to_string(index=False))
 
-        # Additional distribution metrics on config means
-        q1 = grouped['mean_energy'].quantile(0.25)
-        median = grouped['mean_energy'].median()
-        q3 = grouped['mean_energy'].quantile(0.75)
-        iqr = q3 - q1
-        skew = grouped['mean_energy'].skew()
-        kurt = grouped['mean_energy'].kurtosis()
-        count = grouped['mean_energy'].count()
+            # variability & distribution metrics
+            std_means = grouped['mean_energy'].std()
+            cv = std_means / overall_mean
+            q1 = grouped['mean_energy'].quantile(0.25)
+            median = grouped['mean_energy'].median()
+            q3 = grouped['mean_energy'].quantile(0.75)
+            iqr = q3 - q1
+            skew = grouped['mean_energy'].skew()
+            kurt = grouped['mean_energy'].kurtosis()
+            count = grouped.shape[0]
 
-        print(f"\nAdditional metrics (based on config means) for {model}:")
-        print(f"        Count: {count}")
-        print(f"        Quartiles (25th/50th/75th): {q1:.4f}, {median:.4f}, {q3:.4f}")
-        print(f"        IQR: {iqr:.4f}")
-        print(f"        Skewness: {skew:.2f}, Kurtosis: {kurt:.2f}")
-        print("----")
+            print(f"\nVariability & distribution:")
+            print(f" Count: {count}")
+            print(f" Std dev: {std_means:.4f} kWh ({cv:.2%} of mean)")
+            print(f" Quartiles (25% / 50% / 75%): {q1:.4f}, {median:.4f}, {q3:.4f}")
+            print(f" IQR: {iqr:.4f}")
+            print(f" Skewness: {skew:.2f}, Kurtosis: {kurt:.2f}")
+            print("----")
+
+        # 1️⃣ Summaries on the raw data
+        summarize(model_df, label="raw data")
+
+        # 2️⃣ Remove outliers (1.5×IQR on the raw energy values) and re-run
+        q1_all = model_df['energy_per_token_kwh'].quantile(0.25)
+        q3_all = model_df['energy_per_token_kwh'].quantile(0.75)
+        iqr_all = q3_all - q1_all
+        lower = q1_all - 1.5 * iqr_all
+        upper = q3_all + 1.5 * iqr_all
+        cleaned = model_df[
+            model_df['energy_per_token_kwh'].between(lower, upper)
+        ]
+
+        summarize(cleaned, label="outliers removed (1.5×IQR)")
+
 
 
 def compare_energy_to_appliances(
@@ -187,3 +212,123 @@ def compare_energy_to_appliances(
             print(f"    {app}: Realistic {real_c:.2f}, Artificial {art_c:.2f}, Diff {diff_c:.2f}")
         print()
     
+def artificial_v_realistic(
+    df: pd.DataFrame,
+    avg_len_tokens: int = 300,
+    models: List[str] = None
+):
+    """
+    For each model:
+      - Compute mean kWh per response for Realistic vs Artificial configs
+      - Print absolute diff, ratio, % reduction
+    Do it twice: on raw data, and after removing outliers (1.5×IQR on energy_per_token_kwh).
+    """
+    available = df['model'].unique()
+    models = [m for m in (models or available) if m in available]
+
+    for model in models:
+        mdf = df[df['model'] == model]
+        if mdf.empty:
+            print(f"Model {model}: no data, skipping.")
+            continue
+
+        def summary(sub_df: pd.DataFrame, label: str):
+            # compute per-config mean & per-response energy
+            cfg = (
+                sub_df
+                .groupby('config_name')['energy_per_token_kwh']
+                .mean()
+                .reset_index(name='mean_energy')
+            )
+            cfg['response_energy'] = cfg['mean_energy'] * avg_len_tokens
+
+            real = cfg[cfg['config_name'].str.startswith('R')]
+            art  = cfg[cfg['config_name'].str.startswith('A')]
+
+            e_real = real['response_energy'].mean() if not real.empty else 0.0
+            e_art  = art['response_energy'].mean()  if not art.empty  else 0.0
+
+            diff      = e_art - e_real
+            ratio     = (e_real / e_art) if e_art > 0 else float('nan')
+            reduction = (e_art - e_real) / e_art if e_art > 0 else float('nan')
+
+            print(f"\n--- {model} ({label}) ---")
+            print(f"Realistic mean   : {e_real:.5f} kWh/resp")
+            print(f"Artificial mean  : {e_art:.5f} kWh/resp")
+            print(f"- Abs diff (A−R) : {diff:.5f} kWh")
+            print(f"- Ratio (R/A)    : {ratio:.2f}×")
+            print(f"- % reduction    : {reduction:.2%}")
+
+        # raw data
+        summary(mdf, "raw data")
+
+        # remove outliers on token-level energy before grouping
+        q1 = mdf['energy_per_token_kwh'].quantile(0.25)
+        q3 = mdf['energy_per_token_kwh'].quantile(0.75)
+        iqr = q3 - q1
+        cleaned = mdf[
+            mdf['energy_per_token_kwh'].between(q1 - 1.5*iqr, q3 + 1.5*iqr)
+        ]
+
+        # without outliers
+        summary(cleaned, "outliers removed (1.5×IQR)")
+
+
+def within_realistic(
+    df: pd.DataFrame,
+    avg_len_tokens: int = 300,
+    models: List[str] = None
+):
+    """
+    For each model, among Realistic configs only:
+      - Print worst vs best response-energy, abs diff, % reduction
+    Do it twice: on raw data, and after removing outliers (1.5×IQR on energy_per_token_kwh).
+    """
+    available = df['model'].unique()
+    models = [m for m in (models or available) if m in available]
+
+    for model in models:
+        mdf = df[df['model'] == model]
+        if mdf.empty:
+            print(f"Model {model}: no data, skipping.")
+            continue
+
+        def summary(sub_df: pd.DataFrame, label: str):
+            real = (
+                sub_df[sub_df['config_name'].str.startswith('R')]
+                .groupby('config_name')['energy_per_token_kwh']
+                .mean()
+                .reset_index(name='mean_energy')
+            )
+            if real.empty:
+                print(f"{model} ({label}): no realistic configs.")
+                return
+
+            real['response_energy'] = real['mean_energy'] * avg_len_tokens
+            idx_max = real['response_energy'].idxmax()
+            idx_min = real['response_energy'].idxmin()
+            e_max = real.loc[idx_max, 'response_energy']
+            e_min = real.loc[idx_min, 'response_energy']
+
+            diff = e_max - e_min
+            pct_reduction = (e_max - e_min) / e_max if e_max > 0 else float('nan')
+
+            print(f"\n*** {model} (Realistic — {label}) ***")
+            print(f"Worst (max): {real.loc[idx_max, 'config_name']} @ {e_max:.5f} kWh")
+            print(f"Best  (min): {real.loc[idx_min, 'config_name']} @ {e_min:.5f} kWh")
+            print(f"- Abs diff  : {diff:.5f} kWh")
+            print(f"- % reduction: {pct_reduction:.2%}")
+
+        # raw data
+        summary(mdf, "raw data")
+
+        # remove outliers on token-level energy before grouping
+        q1 = mdf['energy_per_token_kwh'].quantile(0.25)
+        q3 = mdf['energy_per_token_kwh'].quantile(0.75)
+        iqr = q3 - q1
+        cleaned = mdf[
+            mdf['energy_per_token_kwh'].between(q1 - 1.5*iqr, q3 + 1.5*iqr)
+        ]
+
+        # without outliers
+        summary(cleaned, "outliers removed (1.5×IQR)")

@@ -3,7 +3,26 @@ from matplotlib.ticker import MaxNLocator, FuncFormatter
 import pandas as pd
 import numpy as np
 from pandas.api.types import is_numeric_dtype
-from typing import Optional, List
+from typing import Optional, List, Dict
+from matplotlib import cm
+
+# ---------------------------
+# Factory functions for global colour maps
+# ---------------------------
+def make_model_energy_colours(models: List[str], cmap_name: str = 'tab10') -> Dict[str, tuple]:
+    """
+    Create a consistent mapping from model names to colours for energy plots.
+    """
+    cmap = cm.get_cmap(cmap_name, len(models))
+    return {m: cmap(i) for i, m in enumerate(models)}
+
+
+def make_model_throughput_colours(models: List[str], cmap_name: str = 'Reds') -> Dict[str, tuple]:
+    """
+    Create a consistent mapping from model names to colours for throughput plots.
+    """
+    cmap = cm.get_cmap(cmap_name, len(models))
+    return {m: cmap(i) for i, m in enumerate(models)}
 
 # ---------------------------
 # Internal plotting helper
@@ -41,7 +60,6 @@ def _plot_with_band(
                         color=color,
                         alpha=alpha_band)
 
-
 # ---------------------------
 # Generic param vs metric
 # ---------------------------
@@ -49,14 +67,16 @@ def plot_param_vs_metric(
     df: pd.DataFrame,
     param_col: str,
     ax1: str = 'energy_per_token',
-    ax2: Optional[str] = None,          
-    normalise_axes: List[str] = None,
+    ax2: Optional[str] = None,
+    normalise_axes: Optional[List[str]] = None,
     plot_mean: bool = True,
     plot_band: bool = True,
     plot_raw: bool = True,
     add_baseline_energy: bool = False,
     add_baseline_throughput: bool = False,
-    models: List[str] = None
+    models: Optional[List[str]] = None,
+    energy_colours: Optional[Dict[str, tuple]] = None,
+    throughput_colours: Optional[Dict[str, tuple]] = None
 ):
     # metric lookup
     metric_map = {
@@ -74,17 +94,17 @@ def plot_param_vs_metric(
     norm1 = 'ax1' in normalise_axes
     norm2 = 'ax2' in normalise_axes
 
-    # start a fresh figure
-    fig, ax_left = plt.subplots(figsize=(8,6))
-
-    # only create a twin if ax2 is given
-    ax_right = ax_left.twinx() if ax2 else None
-
     # determine which models to loop
     if models is None and 'model' in df.columns:
         models = df['model'].dropna().unique().tolist()
     elif models is None:
         models = [None]
+
+    # default colour maps if none provided
+    if energy_colours is None:
+        energy_colours = make_model_energy_colours(models)
+    if throughput_colours is None:
+        throughput_colours = make_model_throughput_colours(models)
 
     linestyles    = ['-', '--', '-.', (0,(5,1))]
     markers       = ['o','D','^','s']
@@ -92,58 +112,53 @@ def plot_param_vs_metric(
     alpha_scatter = 0.2
     alpha_band    = 0.2
 
-    blue = '#1f77b4'
-    red  = '#d62728'
+    fig, ax_left = plt.subplots(figsize=(8,6))
+    ax_right = ax_left.twinx() if ax2 else None
 
-    # axis labels
     xlabel = param_col.replace('_',' ').title()
-    ax_left.set_xlabel(xlabel)
-    ax_left.set_ylabel(metric_map[ax1]['label'], color=blue)
-    ax_left.tick_params(axis='y', labelcolor=blue)
+    
+    # Pick a sample model to extract colour (e.g. first model)
+    second_model = models[1] if models and models[1] is not None else list(energy_colours.keys())[0]
+
+    # Set axis labels and tick colours
+    ax_left.set_ylabel(metric_map[ax1]['label'], color=energy_colours[second_model])
+    ax_left.tick_params(axis='y', colors=energy_colours[second_model])
     ax_left.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     if ax_right:
-        ax_right.set_ylabel(metric_map[ax2]['label'], color=red)
-        ax_right.tick_params(axis='y', labelcolor=red)
+        ax_right.set_ylabel(metric_map[ax2]['label'], color=throughput_colours[second_model])
+        ax_right.tick_params(axis='y', colors=throughput_colours[second_model])
+
+
 
     last_stats1 = None
 
     for i, model in enumerate(models):
         sub = df[df['model']==model] if model is not None else df
 
-        # --- energy stats ---
         stats1 = sub.groupby(param_col)[metric_map[ax1]['col']].agg(['mean','std'])
         last_stats1 = stats1
-
-        if is_numeric_dtype(stats1.index):
-            xs = stats1.index.astype(float)
-        else:
-            xs = np.arange(len(stats1))
-
+        xs = (stats1.index.astype(float)
+              if is_numeric_dtype(stats1.index)
+              else np.arange(len(stats1)))
         mean1 = stats1['mean'].values
         std1  = stats1['std'].fillna(0).values
 
-        # --- throughput stats if we do ax2 ---
         if ax2:
             stats2 = sub.groupby(param_col)[metric_map[ax2]['col']].agg(['mean','std'])
             mean2  = stats2['mean'].values
             std2   = stats2['std'].fillna(0).values
 
-        # --- normalise if requested ---
         if norm1 and len(mean1):
             base1 = mean1[0]
-            mean1 /= base1
-            std1  /= base1
+            mean1 /= base1; std1  /= base1
             ax_left.yaxis.set_major_formatter(
-                FuncFormatter(lambda v, _: f"{v:.2f}x")
-            )
+                FuncFormatter(lambda v, _: f"{v:.2f}x"))
         if ax2 and norm2 and len(mean2):
             base2 = mean2[0]
-            mean2 /= base2
-            std2  /= base2
+            mean2 /= base2; std2  /= base2
             ax_right.yaxis.set_major_formatter(
-                FuncFormatter(lambda v, _: f"{v:.2f}x")
-            )
+                FuncFormatter(lambda v, _: f"{v:.2f}x"))
 
         ls  = linestyles[i % len(linestyles)]
         mk  = markers[i % len(markers)]
@@ -152,9 +167,8 @@ def plot_param_vs_metric(
         # plot energy
         _plot_with_band(
             ax_left, xs, mean1, std1,
-            color=blue,
-            linestyle=ls,
-            marker=mk,
+            color=energy_colours.get(model, 'gray'),
+            linestyle=ls, marker=mk,
             label=f"{lbl} (Energy)",
             alpha_line=alpha_line,
             alpha_scatter=alpha_scatter,
@@ -164,19 +178,19 @@ def plot_param_vs_metric(
         )
         if add_baseline_energy and len(mean1):
             base = 1.0 if norm1 else mean1[0]
-            ax_left.axhline(base, linestyle=':', color=blue, alpha=0.4)
+            ax_left.axhline(base, linestyle=':',
+                            color=energy_colours.get(model, 'gray'),
+                            alpha=0.4)
             ax_left.text(xs[-1], base,
                          f"Energy baseline ({xlabel}: {stats1.index[0]})",
-                         ha='right', va='bottom',
-                         fontsize='small', color=blue, alpha=0.4)
+                         ha='right', va='bottom', fontsize='small', alpha=0.4)
 
-        # plot throughput if asked
+        # plot throughput
         if ax2:
             _plot_with_band(
                 ax_right, xs, mean2, std2,
-                color=red,
-                linestyle=ls,
-                marker=mk,
+                color=throughput_colours.get(model, 'gray'),
+                linestyle=ls, marker=mk,
                 label=f"{lbl} (Throughput)",
                 alpha_line=alpha_line,
                 alpha_scatter=alpha_scatter,
@@ -186,88 +200,127 @@ def plot_param_vs_metric(
             )
             if add_baseline_throughput and len(mean2):
                 base2 = 1.0 if norm2 else mean2[0]
-                ax_right.axhline(base2, linestyle=':', color=red, alpha=0.4)
+                ax_right.axhline(base2, linestyle=':',
+                                color=throughput_colours.get(model, 'gray'), alpha=0.4)
                 ax_right.text(xs[-1], base2,
                               f"Throughput baseline ({xlabel}: {stats2.index[0]})",
-                              ha='right', va='bottom',
-                              fontsize='small', color=red, alpha=0.4)
+                              ha='right', va='bottom', fontsize='small', alpha=0.4)
 
-    # if x-axis is categorical, relabel the ticks
     if last_stats1 is not None and not is_numeric_dtype(last_stats1.index):
         ax_left.set_xticks(np.arange(len(last_stats1)))
         ax_left.set_xticklabels(last_stats1.index.tolist())
 
-    # tidy up legend & grid
     handles, labels = ax_left.get_legend_handles_labels()
-    if ax2:
+    if ax_right:
         h2, l2 = ax_right.get_legend_handles_labels()
         handles += h2; labels += l2
     ax_left.legend(handles, labels, loc='best')
-
-    # if there is NO second axis, hide the right spine completely
     if ax_right is None:
         ax_left.spines['right'].set_visible(False)
-
     ax_left.grid(True, axis='y', linestyle='--', alpha=0.4)
-    ax_left.grid(True, axis='x', linestyle=':',  alpha=0.2)
+    ax_left.grid(True, axis='x', linestyle=':', alpha=0.2)
 
-    # adaptive title
-    title = metric_map[ax1]['label']
-    if ax2:
-        title += " & " + metric_map[ax2]['label']
+    title = metric_map[ax1]['label'] + (" & " + metric_map[ax2]['label'] if ax2 else "")
     title += f" vs {xlabel}"
-    plt.title(title)
-
+    suffix = "\n(Normalised)" if norm1 or norm2 else "\n(Absolute Values)"
+    plt.title(title + suffix)
     plt.tight_layout()
     plt.show()
 
+# ---------------------------
+# Wrappers 
+# ---------------------------
 
-# ---------------------------
-# Wrappers
-# ---------------------------
-def plot_num_processes(dfs, **kwargs):
-    df = dfs['num_processes'].copy()
+def plot_batching(
+    dfs,
+    MODEL_COLOURS: Optional[Dict[str, tuple]] = None,
+    **kwargs
+):
+    if isinstance(dfs, dict):
+        df = dfs['batching'].copy().rename(
+            columns={'batch_size___fixed_batching': 'batch_size'}
+        )
+    elif isinstance(dfs, pd.DataFrame):
+        df = dfs.copy().rename(
+            columns={'batch_size___fixed_batching': 'batch_size'}
+        )
+    else:
+        raise ValueError("dfs must be a dict or a DataFrame")
+    
+    # extract energy & throughput maps
+    energy_colours     = {m: c['energy']     for m, c in MODEL_COLOURS.items()}
+    throughput_colours = {m: c['throughput'] for m, c in MODEL_COLOURS.items()}
+    
+    df['model'] = df.get('model', None)
+    plot_param_vs_metric(
+        df,
+        param_col='batch_size',
+        energy_colours=energy_colours,
+        throughput_colours=throughput_colours,
+        **kwargs
+    )
+
+def plot_num_processes(
+    dfs,
+    MODEL_COLOURS: Optional[Dict[str, tuple]] = None,
+    **kwargs
+):
+    if isinstance(dfs, dict):
+        df = dfs['num_processes'].copy()
+    elif isinstance(dfs, pd.DataFrame):
+        df = dfs.copy()
+    else:
+        raise ValueError("dfs must be a dict or a DataFrame")
+    
+    # extract energy & throughput maps
+    energy_colours     = {m: c['energy']     for m, c in MODEL_COLOURS.items()}
+    throughput_colours = {m: c['throughput'] for m, c in MODEL_COLOURS.items()}
+    
     df['model'] = df.get('model', None)
     df['num_processes'] = df['num_processes'].astype(int)
-    plot_param_vs_metric(df, 'num_processes', **kwargs)
-
-
-def plot_batching(dfs, **kwargs):
-    df = dfs['batching'].copy().rename(
-        columns={'batch_size___fixed_batching': 'batch_size'}
+    plot_param_vs_metric(
+        df,
+        param_col='num_processes',
+        energy_colours=energy_colours,
+        throughput_colours=throughput_colours,
+        **kwargs
     )
-    df['model'] = df.get('model', None)
-    plot_param_vs_metric(df, 'batch_size', **kwargs)
 
 
-def plot_precision(dfs, **kwargs):
-    """
-    Plot Energy & optional Throughput vs precision.
-    One line per original model.
-    """
-    df = dfs.get('precis')
-    if df is None:
-        print("precis DataFrame not found in dfs.")
-        return
-
+def plot_precision(
+    dfs,
+    MODEL_COLOURS: Optional[Dict[str, tuple]] = None,
+    **kwargs
+):
+    if isinstance(dfs, dict):
+        df = dfs.get('precis')
+    elif isinstance(dfs, pd.DataFrame):
+        df = dfs.copy()
+    else:
+        raise ValueError("dfs must be a dict or a DataFrame")
+    
+    # extract energy & throughput maps
+    energy_colours     = {m: c['energy']     for m, c in MODEL_COLOURS.items()}
+    throughput_colours = {m: c['throughput'] for m, c in MODEL_COLOURS.items()}
+    
+    
     df = df.copy()
     if 'model' not in df.columns:
         df['model'] = None
-
     def _mode(r):
         if r.get('load_in_4bit'):      return 'INT4'
         if r.get('load_in_8bit'):      return 'INT8'
         if r.get('fp_precision')=='torch.float16': return 'FP16'
         return 'FP32'
-
     df['precision'] = pd.Categorical(
         df.apply(_mode, axis=1),
         categories=['FP32','FP16','INT8','INT4'],
         ordered=True
     )
-
     plot_param_vs_metric(
         df,
         param_col='precision',
+        energy_colours=energy_colours,
+        throughput_colours=throughput_colours,
         **kwargs
     )
