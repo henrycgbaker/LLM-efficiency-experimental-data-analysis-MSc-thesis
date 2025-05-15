@@ -70,12 +70,12 @@ def plot_throughput_vs_energy(df, model_colours):
     """
     plt.figure(figsize=(8, 6))
     for model, subset in df.groupby('model'):
-        plt.scatter(subset['throughput_queries_per_sec'],
+        plt.scatter(subset['throughput_tokens_per_sec'],
                     subset['energy_per_token_kwh'],
                     alpha=0.7, label=model, color=model_colours[model]['energy'])
-    plt.xlabel('Throughput (queries/sec)')
+    plt.xlabel('Throughput (tokens/sec)')
     plt.ylabel('Energy per Token (kWh)')
-    plt.title('Throughput vs Energy per Token by Model')
+    plt.title('Throughput vs Energy per Token')
     plt.legend(title='Model')
     plt.grid(True, linestyle='--', alpha=0.4)
     plt.tight_layout()

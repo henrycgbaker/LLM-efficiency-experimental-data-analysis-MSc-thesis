@@ -530,7 +530,7 @@ def create_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
     df['flops_per_token'] = df['flops'] / df['total_generated_tokens']
     df['energy_per_token_kwh'] = df['total_energy_kwh'] / df['total_generated_tokens']
     df['divergence_energy_flops'] = df['energy_per_token_kwh'] / df['flops_per_token']
-    df['gpu_utilization_proc_all'] = df[['gpu_utilization_percent_0', 'gpu_utilization_percent_1', 'gpu_utilization_percent_2', 'gpu_utilization_percent_3']].mean(axis=1)
+    df['gpu_utilization_proc_all'] = df[['gpu_utilization_percent_0', 'gpu_utilization_percent_1', 'gpu_utilization_percent_2', 'gpu_utilization_percent_3']].mean(axis=1) / 4
     df['gpu_power_proc_all'] = df[['gpu_power_process_0', 'gpu_power_process_1', 'gpu_power_process_2', 'gpu_power_process_3']].mean(axis=1)
 
     return df

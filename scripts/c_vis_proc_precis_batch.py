@@ -81,9 +81,14 @@ def plot_param_vs_metric(
     # metric lookup
     metric_map = {
         'energy_per_token':         {'col': 'energy_per_token_kwh',
-                                     'label': 'Energy per Token (kWh)'},
+                                     'label': 'Energy per Token (kWh)',
+                                     'legend': 'Energy'},
         'throughput_tokens_per_sec':{'col': 'throughput_tokens_per_sec',
-                                     'label': 'Throughput (tokens/sec)'}
+                                     'label': 'Throughput (tokens/sec)',
+                                     'legend': 'Throughput'},
+        'gpu_utilization_proc_all':{ 'col': 'gpu_utilization_proc_all',
+                                     'label': 'GPU Utilisation (mean over processes))',
+                                     'legend': 'GPU Utilisation'}
     }
     if ax1 not in metric_map:
         raise ValueError(f"ax1 must be one of {list(metric_map.keys())}")
@@ -112,31 +117,39 @@ def plot_param_vs_metric(
     alpha_scatter = 0.2
     alpha_band    = 0.2
 
-    fig, ax_left = plt.subplots(figsize=(8,6))
+    # human-readable axis labels
+    xlabel_map = {
+        'batch_size': 'Batch Size',
+        'num_processes': 'Number of Distributed Processes',
+        'precision': 'Numerical Precision'
+    }
+    xlabel = xlabel_map.get(param_col, param_col.replace('_', ' ').title())
+
+    # prepare display metrics (strip units, hyphenate)
+    raw_ax1_label = metric_map[ax1]['label'].split('(')[0].strip()
+    display_ax1  = raw_ax1_label.replace(' ', '-').lower().capitalize()
+    if ax2:
+        raw_ax2_label = metric_map[ax2]['label'].split('(')[0].strip()
+        display_ax2  = raw_ax2_label.replace(' ', '-').lower().capitalize()
+
+    fig, ax_left = plt.subplots(figsize=(8, 6))
     ax_right = ax_left.twinx() if ax2 else None
 
-    xlabel = param_col.replace('_',' ').title()
-    
-    # Pick a sample model to extract colour (e.g. first model)
-    second_model = models[1] if models and models[1] is not None else list(energy_colours.keys())[0]
-
-    # Set axis labels and tick colours
-    ax_left.set_ylabel(metric_map[ax1]['label'], color=energy_colours[second_model])
-    ax_left.tick_params(axis='y', colors=energy_colours[second_model])
+    # set axis labels
+    ax_left.set_xlabel(xlabel)
+    ax_left.set_ylabel(metric_map[ax1]['label'], color=energy_colours[list(energy_colours.keys())[0]])
+    ax_left.tick_params(axis='y', colors=energy_colours[list(energy_colours.keys())[0]])
     ax_left.xaxis.set_major_locator(MaxNLocator(integer=True))
-
     if ax_right:
-        ax_right.set_ylabel(metric_map[ax2]['label'], color=throughput_colours[second_model])
-        ax_right.tick_params(axis='y', colors=throughput_colours[second_model])
-
-
+        ax_right.set_ylabel(metric_map[ax2]['label'], color=throughput_colours[list(throughput_colours.keys())[0]])
+        ax_right.tick_params(axis='y', colors=throughput_colours[list(throughput_colours.keys())[0]])
 
     last_stats1 = None
 
     for i, model in enumerate(models):
-        sub = df[df['model']==model] if model is not None else df
+        sub = df[df['model'] == model] if model is not None else df
 
-        stats1 = sub.groupby(param_col)[metric_map[ax1]['col']].agg(['mean','std'])
+        stats1 = sub.groupby(param_col)[metric_map[ax1]['col']].agg(['mean', 'std'])
         last_stats1 = stats1
         xs = (stats1.index.astype(float)
               if is_numeric_dtype(stats1.index)
@@ -145,18 +158,18 @@ def plot_param_vs_metric(
         std1  = stats1['std'].fillna(0).values
 
         if ax2:
-            stats2 = sub.groupby(param_col)[metric_map[ax2]['col']].agg(['mean','std'])
+            stats2 = sub.groupby(param_col)[metric_map[ax2]['col']].agg(['mean', 'std'])
             mean2  = stats2['mean'].values
             std2   = stats2['std'].fillna(0).values
 
         if norm1 and len(mean1):
             base1 = mean1[0]
-            mean1 /= base1; std1  /= base1
+            mean1 /= base1; std1 /= base1
             ax_left.yaxis.set_major_formatter(
                 FuncFormatter(lambda v, _: f"{v:.2f}x"))
         if ax2 and norm2 and len(mean2):
             base2 = mean2[0]
-            mean2 /= base2; std2  /= base2
+            mean2 /= base2; std2 /= base2
             ax_right.yaxis.set_major_formatter(
                 FuncFormatter(lambda v, _: f"{v:.2f}x"))
 
@@ -164,12 +177,12 @@ def plot_param_vs_metric(
         mk  = markers[i % len(markers)]
         lbl = str(model) if model is not None else 'all'
 
-        # plot energy
+        # plot energy curve
         _plot_with_band(
             ax_left, xs, mean1, std1,
             color=energy_colours.get(model, 'gray'),
             linestyle=ls, marker=mk,
-            label=f"{lbl} (Energy)",
+            label=f"{lbl} {metric_map[ax1]['legend']}",
             alpha_line=alpha_line,
             alpha_scatter=alpha_scatter,
             alpha_band=alpha_band,
@@ -185,13 +198,13 @@ def plot_param_vs_metric(
                          f"Energy baseline ({xlabel}: {stats1.index[0]})",
                          ha='right', va='bottom', fontsize='small', alpha=0.4)
 
-        # plot throughput
+        # plot throughput curve
         if ax2:
             _plot_with_band(
                 ax_right, xs, mean2, std2,
                 color=throughput_colours.get(model, 'gray'),
                 linestyle=ls, marker=mk,
-                label=f"{lbl} (Throughput)",
+                label=f"{lbl} {metric_map[ax2]['legend']}",
                 alpha_line=alpha_line,
                 alpha_scatter=alpha_scatter,
                 alpha_band=alpha_band,
@@ -201,15 +214,17 @@ def plot_param_vs_metric(
             if add_baseline_throughput and len(mean2):
                 base2 = 1.0 if norm2 else mean2[0]
                 ax_right.axhline(base2, linestyle=':',
-                                color=throughput_colours.get(model, 'gray'), alpha=0.4)
+                                 color=throughput_colours.get(model, 'gray'), alpha=0.4)
                 ax_right.text(xs[-1], base2,
                               f"Throughput baseline ({xlabel}: {stats2.index[0]})",
                               ha='right', va='bottom', fontsize='small', alpha=0.4)
 
+    # set categorical ticks if needed
     if last_stats1 is not None and not is_numeric_dtype(last_stats1.index):
         ax_left.set_xticks(np.arange(len(last_stats1)))
         ax_left.set_xticklabels(last_stats1.index.tolist())
 
+    # legend & styling
     handles, labels = ax_left.get_legend_handles_labels()
     if ax_right:
         h2, l2 = ax_right.get_legend_handles_labels()
@@ -220,8 +235,11 @@ def plot_param_vs_metric(
     ax_left.grid(True, axis='y', linestyle='--', alpha=0.4)
     ax_left.grid(True, axis='x', linestyle=':', alpha=0.2)
 
-    title = metric_map[ax1]['label'] + (" & " + metric_map[ax2]['label'] if ax2 else "")
-    title += f" vs {xlabel}"
+    # build and set title (hyphenated, no units)
+    if ax2:
+        title = f"{display_ax1} & {display_ax2} vs {xlabel.replace(' ', '-')}"
+    else:
+        title = f"{display_ax1} vs {xlabel.replace(' ', '-')}"
     suffix = "\n(Normalised)" if norm1 or norm2 else "\n(Absolute Values)"
     plt.title(title + suffix)
     plt.tight_layout()
@@ -230,7 +248,6 @@ def plot_param_vs_metric(
 # ---------------------------
 # Wrappers 
 # ---------------------------
-
 def plot_batching(
     dfs,
     MODEL_COLOURS: Optional[Dict[str, tuple]] = None,
@@ -247,7 +264,6 @@ def plot_batching(
     else:
         raise ValueError("dfs must be a dict or a DataFrame")
     
-    # extract energy & throughput maps
     energy_colours     = {m: c['energy']     for m, c in MODEL_COLOURS.items()}
     throughput_colours = {m: c['throughput'] for m, c in MODEL_COLOURS.items()}
     
@@ -272,7 +288,6 @@ def plot_num_processes(
     else:
         raise ValueError("dfs must be a dict or a DataFrame")
     
-    # extract energy & throughput maps
     energy_colours     = {m: c['energy']     for m, c in MODEL_COLOURS.items()}
     throughput_colours = {m: c['throughput'] for m, c in MODEL_COLOURS.items()}
     
@@ -299,10 +314,8 @@ def plot_precision(
     else:
         raise ValueError("dfs must be a dict or a DataFrame")
     
-    # extract energy & throughput maps
     energy_colours     = {m: c['energy']     for m, c in MODEL_COLOURS.items()}
     throughput_colours = {m: c['throughput'] for m, c in MODEL_COLOURS.items()}
-    
     
     df = df.copy()
     if 'model' not in df.columns:
