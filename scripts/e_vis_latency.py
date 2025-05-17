@@ -68,9 +68,7 @@ def _plot_with_band(ax, raw_df, x_col, y_col, mean_df, mean_col, std_col,
         upper     = (mean_vals + std_vals/baseline)
         ax.yaxis.set_major_formatter(FuncFormatter(lambda v, pos: f"{v:.2f}x"))
         old_ylabel = ax.get_ylabel()
-        if "(normalized)" not in old_ylabel:
-            ax.set_ylabel(f"{old_ylabel} (normalized)", color=ax.yaxis.label.get_color())
-
+    
     # raw scatter
     if plot_raw and not raw_df.empty:
         y = raw_df[y_col].values.astype(float)
@@ -128,12 +126,18 @@ def plot_latency_burst_size(
     classes = [('Constant', 'class_const', 'tab:orange')]
     cmap = cm.get_cmap('Blues', len(sizes)+1)
     for i, sz in enumerate(sizes, start=1):
-        classes.append((f'Burst {sz}', f'class_burst_{sz}', cmap(i)))
+        classes.append((f'Queries: {sz}', f'class_burst_{sz}', cmap(i)))
 
     fig, ax = plt.subplots(figsize=(8,6))
-    ax.set_xlabel('Latency (ms)')
+    ax.set_xlabel('Latency Interval (range in ms)')
     ax.set_ylabel('Energy-per-Token (kWh)')
-    ax.set_title('Energy-per-Token vs Latency (grouped by Burst Size)')
+    
+    if normalise_axes:
+        suffix = "Normalised"
+    else:
+        "Absolute Values"
+    
+    ax.set_title(f'Energy-per-Token vs Latency - grouped by Burst Size\nfor {model} ({suffix})')
     ax.grid(True, axis='y', linestyle='--', alpha=0.4)
     ax.grid(True, axis='x', linestyle=':',  alpha=0.2)
 
@@ -162,7 +166,7 @@ def plot_latency_burst_size(
                 plot_mean = plot_mean,
                 plot_band = plot_band,
                 plot_raw = plot_raw,
-                label_mean = f"{m}:{label}"
+                label_mean = f"{label}"
             )
 
     # optional baselines
@@ -173,7 +177,7 @@ def plot_latency_burst_size(
             stats = bdf.groupby('decoder_temperature')['energy_per_token_kwh'].mean()
             base  = 1.0 if ax in norm_axes else stats.iloc[0]
             xs    = stats.index.astype(float)
-            lbl   = f"Baseline {m}:greedy"
+            lbl   = f"Baseline {m}:no latency"
             ax.axhline(base, linestyle=':', color='gray', alpha=0.6)
             ax.text(xs[-1], base, lbl, ha='right', va='bottom',
                     fontsize='small', color='gray', alpha=0.4)
@@ -189,7 +193,7 @@ def plot_latency_burst_size(
     ax.set_xticks(all_means)
     ax.set_xticklabels(tick_labels)
 
-    ax.legend(loc='best', title='Model:Class')
+    ax.legend(loc='best', title='Burst Size')
     plt.tight_layout()
     plt.show()    
 
@@ -252,9 +256,16 @@ def plot_latency_burst_interval(
         classes.append((f'Interval {iv}', f'class_interval_{iv}', cmap(i)))
 
     fig, ax = plt.subplots(figsize=(8,6))
-    ax.set_xlabel('Latency (ms)')
+    ax.set_xlabel('Latency Interval (range in ms)')
     ax.set_ylabel('Energy-per-Token (kWh)')
-    ax.set_title('Energy-per-Token vs Latency (grouped by Burst Interval)')
+    
+    if normalise_axes:
+        suffix = "Normalised" 
+    else:
+        "Absolute Values"
+
+    
+    ax.set_title(f'Energy-per-Token vs Latency - grouped by Burst Interval\nfor {model} ({suffix})')
     ax.grid(True, axis='y', linestyle='--', alpha=0.4)
     ax.grid(True, axis='x', linestyle=':',  alpha=0.2)
 
@@ -282,7 +293,7 @@ def plot_latency_burst_interval(
                 plot_mean = plot_mean,
                 plot_band = plot_band,
                 plot_raw = plot_raw,
-                label_mean = f"{m}:{label}"
+                label_mean = f"{label}"
             )
 
     if add_baseline_energy:
@@ -292,7 +303,7 @@ def plot_latency_burst_interval(
             stats = bdf.groupby('decoder_temperature')['energy_per_token_kwh'].mean()
             base  = 1.0 if ax in norm_axes else stats.iloc[0]
             xs    = stats.index.astype(float)
-            lbl   = f"Baseline {m}:greedy"
+            lbl   = f"Baseline {m}:no latency"
             ax.axhline(base, linestyle=':', color='gray', alpha=0.6)
             ax.text(xs[-1], base, lbl, ha='right', va='bottom',
                     fontsize='small', color='gray', alpha=0.4)
@@ -308,6 +319,6 @@ def plot_latency_burst_interval(
     ax.set_xticks(all_means)
     ax.set_xticklabels(tick_labels)
 
-    ax.legend(loc='best', title='Model:Class')
+    ax.legend(loc='best', title='Burst Interval (ms)')
     plt.tight_layout()
     plt.show()

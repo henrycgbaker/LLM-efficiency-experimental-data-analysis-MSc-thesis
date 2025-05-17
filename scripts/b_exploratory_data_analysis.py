@@ -27,7 +27,7 @@ def plot_energy_histograms(df, model_colours, bins=90):
     for model, subset in df.groupby('model'):
         plt.hist(subset['energy_per_token_kwh'], 
                  bins=bins,
-                 alpha=0.5, 
+                 alpha=0.4, 
                  label=model, 
                  color=model_colours[model]['energy'])
     plt.xlabel('Energy per Token (kWh)')
@@ -72,7 +72,7 @@ def plot_throughput_vs_energy(df, model_colours):
     for model, subset in df.groupby('model'):
         plt.scatter(subset['throughput_tokens_per_sec'],
                     subset['energy_per_token_kwh'],
-                    alpha=0.7, label=model, color=model_colours[model]['energy'])
+                    alpha=0.3, label=model, color=model_colours[model]['energy'])
     plt.xlabel('Throughput (tokens/sec)')
     plt.ylabel('Energy per Token (kWh)')
     plt.title('Throughput vs Energy per Token')

@@ -88,7 +88,10 @@ def plot_param_vs_metric(
                                      'legend': 'Throughput'},
         'gpu_utilization_proc_all':{ 'col': 'gpu_utilization_proc_all',
                                      'label': 'GPU Utilisation (mean over processes))',
-                                     'legend': 'GPU Utilisation'}
+                                     'legend': 'GPU Utilisation'},
+        'gpu_utilization_percent_0':{ 'col': 'gpu_utilization_percent_0',
+                                     'label': 'GPU Utilisation (mean over processes))',
+                                     'legend': 'GPU Utilisation'},
     }
     if ax1 not in metric_map:
         raise ValueError(f"ax1 must be one of {list(metric_map.keys())}")
