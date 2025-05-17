@@ -113,16 +113,17 @@ def compare_energy_to_appliances(
     5) Comparison: Realistic vs Artificial group means
     """
     # Default appliance energy usages
-    if appliances_kwh is None:
+    if appliances_kwh is None:        
         appliances_kwh = {
-            "iPhone_charge": 0.01,
-            "laptop_charge": 0.05,
-            "wifi_router_24h": 0.024,
-            "streaming_1hr": 0.05,
-            "google_search": 0.0003,
-            "kettle": 0.1,
-            "shower": 2.6
+            "iPhone_charge":     0.015,    # kWh per full charge
+            "MacBook_charge":    0.08,     # kWh per full charge
+            "wifi_router_24h":   0.24,     # kWh per 24 h
+            "streaming_1hr":     0.6,      # kWh per hour streaming
+            "google_search":     0.0003,   # kWh per search
+            "kettle":            0.075,    # kWh per boil (~3 min)
+            "shower":            1.58      # kWh per 10 min electric shower
         }
+
 
     # Determine models to include
     available = df['model'].unique()
