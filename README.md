@@ -1,8 +1,11 @@
-# LLM Efficiency Measurement: Thesis Analysis
+# LLM Efficiency Measurement at Inference Time
 
 [![Read the Thesis](https://img.shields.io/badge/📄_Read_Thesis-PDF-blue?style=for-the-badge)](thesis/henry_baker_thesis.pdf)
+[![Submitted](https://img.shields.io/badge/Submitted-August_2025-green?style=for-the-badge)](thesis/henry_baker_thesis.pdf)
 
-This repository contains the complete thesis, analysis scripts, and experimental data for my MDS thesis on LLM energy efficiency measurement.
+> **The Implementation Gap: Inducing Variation in LLM Inference-time Energy Efficiency for Fixed Computational Workloads**
+
+This repository contains the complete thesis, analysis scripts, and experimental data for my MDS thesis on LLM energy efficiency measurement at inference time.
 
 ## Repository Structure
 
