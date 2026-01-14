@@ -1,0 +1,3 @@
+[submodule "tools/llm-efficiency-measurement-tool"]
+	path = tools/llm-efficiency-measurement-tool
+	url = https://github.com/henrycgbaker/llm-efficiency-measurement-tool.git

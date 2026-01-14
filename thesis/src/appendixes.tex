@@ -1,0 +1,317 @@
+\section{Appendix: Developed Python Package}
+\label{appendix:python_package}
+
+\subsection{GitHub URLs}
+
+\begin{enumerate}
+    \item Python Package: \url{https://github.com/henrycgbaker/thesis}
+    \item Analysis of Results: \url{https://github.com/henrycgbaker/thesis_analysis}
+\end{enumerate}
+
+\subsection{Description of package}
+
+The core work of this thesis was in developing a Python package that measures the energy outcomes of deployed Hugging Face models. At its core, the package separates responsibilities into distinct layers: top-level experiment drivers, orchestration utilities, core experiment logic, and configuration modules. 
+
+The first layer consists of the top-level driver scripts (\texttt{MAIN\_*.py}), which interleave to handle controlled sweeps over variables. Of these, a master script coordinates the entire suite, invoking each driver in sequence or parallel as needed.
+
+Beneath the drivers lies the \texttt{experiment\_orchestration\_utilities} package, which provides an object-oriented \texttt{ExperimentRunner} class and workflow definitions. The \texttt{ExperimentRunner} initialises experiment metadata, logging, and output directories, manages the full lifecycle of each run, and ensures proper cleanup and error handling. Complementary helper functions handle batch launches and resource management, enabling fully parallel or distributed execution across GPUs.
+
+The orchestration scripts call on a series of helper functions in the \texttt{core\_experiment\_utils} to implement the logic that actually powers the experiments. These modules manage unitary tasks such as loading and placing models on devices, processing and tokenising prompts, executing inference, and capturing both performance and energy consumption metrics. Dedicated submodules further derive additional metrics and aggregate all results to a single experiment-run level. Finally, results are serialised to structured JSON, CSV, and metadata files, creating a standardised output format for downstream analysis.
+
+Configuration in this framework is handled through a suite of modules that define default settings, model lists, controlled-variable sets, scenario definitions, and grid-search ranges. A base \texttt{Config} class loads and validates parameters, while utility functions allow for dynamic overrides from the command line. By editing a single config file, users can control every aspect of an experiment—from batch size and random seed to the names of models under test and the energy-monitoring library in use.
+
+To get started, users install the required packages in the \texttt{requirements.txt} file and prepare a configuration file (or define parameters in the \texttt{configs} sub-package for automated generation of configurations across a given search space). Running a custom experiment involves invoking one of the \texttt{MAIN\_*.py} scripts with the \texttt{--config} flag pointing to the desired configuration, however I suggest starting with the \texttt{MAIN\_run\_experimental\_suite.py} and defining the necessary parameters in the relevant \texttt{*\_config.py} file in the \texttt{config directory}, so that the rest of the workflow is already handled programmatically. Outputs are collected under the \texttt{results/} directory, where they are directly saved as an input into a collected CSV, with additional generated subfolders for run-level raw inference outputs, computed metrics, energy logs, and experiment metadata.
+
+Extending the framework is a matter of adding or customising modules. Researchers can integrate new models by updating the model loader and configuration, implement additional metrics by adding functions to the metrics subpackages, or design entirely new workflows (i.e. beyond standard text generation tasks) by subclassing the \texttt{ExperimentRunner} and defining custom steps. 
+
+\newpage
+
+\begin{landscape}
+\section{Appendix: Energy Appliance Calculations}
+\label{appendix:energy_app_calcs}
+
+\begin{table}[ht]
+  \centering
+  \caption{Energy consumption of common appliances per use}
+  \label{tab:appliance_energy}
+  \begin{tabular}{@{} l l l l l @{}}
+    \toprule
+    \textbf{Appliance}        & \textbf{Usage}    & \textbf{Energy (kWh)} & \textbf{Justification}                                         & \textbf{Source}               \\
+    \midrule
+    iPhone 16                 & Full charge       & $\sim0.015$          & Battery $\sim$13.7 Wh; inefficiencies → $\sim0.015$kWh        & \url{macworld.com}            \\
+    MacBook Pro 2023 (M3)     & Full charge       & $\sim0.09$            & 99.6Wh → 0.0996kWh            & \url{support.apple.com}       \\
+    Wi-Fi Router              & 24h              & $\sim0.144$          & 6W × 24h = 144Wh = 0.144kWh                                  & \url{energyusecalculator.com} \\
+    HD Streaming              & 1h               & $\sim0.08$           & IEA: ≈0.077kWh per hour of HD                                 & \url{carbonbrief.org}         \\
+    Google Search             & One query         & $\sim0.0003$         & ≈0.0003kWh (0.3Wh) per search                                & \url{cloudforecast.io}        \\
+    Electric Kettle           & Boil 1L          & $\sim0.10$           & 2–3kW × 3min (0.05h) ⇒ ≈ 0.115kWh per litre                   & \url{electricalfaultsfixed.com}\\
+    Electric Shower           & 10min            & $\sim1.5$            & 9kW × (10/60h) = 1.5kWh            & \url{basengreen.com}          \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\end{landscape}
+
+\section{Appendix: Initial Correlation Plots}
+\label{sec:appendix_corr_plots}
+
+\begin{figure}[H]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/corr_matrix_1b.png}
+    \caption{Correlation Matrix, 1 B}
+    \label{fig:corr_matrix_1b}
+  \end{subfigure}
+
+  \vspace{1em}
+  
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/corr_matrix_3B.png}
+    \caption{Correlation Matrix, 3 B}
+    \label{fig:corr_matrix_3b}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Comparison of feature–feature correlations for the 1 B vs.\ 3 B decoder model (tot robustly modelled)}
+  \label{fig:corr_matrices}
+\end{figure}
+
+\section{Appendix: Miscellaneous Plots}
+\label{sec:appendix_misc_plots}
+
+I did not have time/space to include several plots that I had begun work on - here are some early works that I found interesting, but did not fully develop.\\
+
+\noindent
+\textbf{Note}: these plots contain both 1B and 3B models together and do not visually distinguish between the two - ideally I would have separated these out with different markers and mean lines, which I expect would render interesting patterns more visible. 
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/throughput_energy_by_batch_size.png}
+    \caption{That there's this clear batching distinctions without distinguishing between models, suggests that batch size matters more than model complexity (at the 1B vs 3B scale)}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/latency_throughput_by_batch.png}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/latency_energy_precision.png}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/throughput_energy_precision.png}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/latency_energy_proc.png}
+    \label{fig:enter-label}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/throughput_energy_proc.png}
+    \label{fig:enter-label}
+\end{figure}
+
+\section{Appendix: Baseline Config}
+\label{appendix:base_config}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  stringstyle=\color{orange},
+  commentstyle=\color{gray},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+}
+
+\begin{lstlisting}[caption={Base experiment configuration},label={lst:base_config}]
+base_config = { \\
+    "config_name": None,            \\
+    "suite": None,                   \\
+    "controlled_variation": {},     \\
+    "scenario_info": {},            \\
+    "cycle_id": None,               \\
+
+    "model_name": "TinyLlama/TinyLlama-1.1B-Chat-v1.0", \\
+    "is_encoder_decoder": False, \\
+    "task_type": "text_generation", \\
+    "inference_type": "pure_generative", \\
+    "gpu_list": [0, 1, 2, 3], \\
+    "backend": "pytorch", \\
+    "save_outputs": True, \\
+
+    # Default values (overridden by the grid)
+    "max_input_tokens": 128,        
+    "max_output_tokens": 128,
+    "min_output_tokens": 128,
+    "num_input_prompts": 128,
+    "decode_token_to_text": True,
+    "num_processes": 4,
+    "batching_options": {
+        "batch_size___fixed_batching": 16,
+        "adaptive_batching": False,
+        "adaptive_max_tokens": 0,
+        "max_batch_size___adaptive_batching": 0,
+    },
+    "sharding_config": {
+        "fsdp_config": {
+            "use_orig_params": False,
+            "cpu_offload": False
+        },
+        "sharding_strategy": "NO_SHARD" 
+    },
+    "query_rate": 1.0,
+    "latency_simulation": {
+        "simulate": False,
+        "delay_min": 0,    
+        "delay_max": 0,    
+        "simulate_burst": False,
+        "burst_interval": 0.0,
+        "burst_size": 0
+    },
+    "decoder_config": {
+        "decoding_mode": None,
+        "decoder_temperature": 1.0,
+        "decoder_top_k": None,  
+        "decoder_top_p": None   
+    },
+    "fp_precision": "float32",
+    "quantization_config": {
+        "quantization": None,
+        "load_in_8bit": None,
+        "load_in_4bit": None,
+    }}
+\end{lstlisting}
+
+\newpage
+
+\section{Appendix: Decoder Plots}
+\label{appendix:decoder_plots}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topk_abs_1b.png}
+  \caption{Top–$k$ vs energy outcomes for 1B (absolute).}
+  \label{fig:decoder_topk_abs_1b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topk_norm_1b.png}
+  \caption{Top–$k$ vs energy outcomes for 1B (normalised).}
+  \label{fig:decoder_topk_norm_1b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topk_abs_3b.png}
+  \caption{Top–$k$ vs energy outcomes for 3B (absolute).}
+  \label{fig:decoder_topk_abs_3b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topk_norm_3b.png}
+  \caption{Top–$k$ vs energy outcomes for 3B (normalised).}
+  \label{fig:decoder_topk_norm_3b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topp_abs_1b.png}
+  \caption{Top–$p$ vs energy outcomes for 1B (absolute).}
+  \label{fig:topp_abs_1b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topp_abs_3b.png}
+  \caption{Top–$p$ vs energy outcomes for 3B (absolute).}
+  \label{fig:topp_abs_3b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topp_norm_1b.png}
+  \caption{Top–$p$ vs energy outcomes for 1B (normalised).}
+  \label{fig:topp_norm_1b}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/decoder_topp_norm_3b.png}
+  \caption{Top–$p$ vs energy outcomes for 3B (normalised).}
+  \label{fig:topp_norm_3b}
+\end{figure}
+
+\newpage
+
+\section{Appendix: Throughput Plots}
+\label{appendix:throughput_plots}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/batch_throughput_norm.png}
+  \caption{Batch size (normalised)}
+  \label{fig:batch_throughput_norm}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/precision_throughput_norm.png}
+  \caption{Precision (normalised)}
+  \label{fig:precision_throughput_norm}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/num_proc_throughput_norm.png}
+  \caption{Number of processes (normalised)}
+  \label{fig:num_proc_throughput_norm}
+\end{figure}
+
+
+
+\begin{landscape}
+\section{Appendix: Simulated Scenario Configurations}
+\label{appendix:sim_scenarios}
+
+\begin{table}[ht]
+  \centering
+  \caption{Overview of scenario configurations}
+  \label{tab:scenario_configs}
+  \begin{tabular}{@{}lcccccccl@{}}
+    \toprule
+    \textbf{Scenario} & \textbf{Batch} & \textbf{Precision} & \textbf{Quantization} & \textbf{Decoding} & \textbf{Latency Sim?} & \textbf{Delay (s)} & \textbf{Burst?} & \textbf{Realistic} \\
+    \midrule
+    A1\_ideal                          & 128 & float16 & None   & greedy           & No  & –        & No          & No  \\
+    R1     &   4 & float16 & None   & top-k (k=500)           & Yes & 0.01–0.10 & No          & Yes \\
+    R2             &   8 & float16 & None   & top\_p (p=0.9)   & Yes & 0.01–0.10 & No          & Yes \\
+    R3          &  16 & - & 4-bit  & multinomial           & Yes & 0.05–0.50 & Yes (3s, 6) & Yes \\
+    R4    &   8 & - & 8-bit  & top\_p (p=0.8)   & Yes & 0.05–0.50 & Yes (3s, 6) & Yes \\
+    R5            &  10 & float32 & None   & multinomial           & Yes & 0.30–0.80 & Yes (4s, 5) & Yes \\
+    R6              &   16 & float32 & None   & top\_k (k=400)   & Yes & 0.30–0.80 & Yes (4s, 5) & Yes \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Note:} For all scenarios, the number of GPUs and parallel processes is held constant at four. Although deploying on four GPUs is excessive for the LLaMA-3.2-1B and 3B models studied here - and leads to device under-utilisation - this choice was deliberately made to reflect typical production deployments. Larger-scale LLMs typical of industry, generally require small GPU clusters for efficient inference serving, thus employing four GPUs yields energy consumption results (slightly) more representative of realistic production environments - a (pragmatic, and problematic step for internal-validity) step towards enhancing external validity.
+
+\end{landscape}
+
+
+
+
+\newpage

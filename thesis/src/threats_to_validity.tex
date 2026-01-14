@@ -1,0 +1,47 @@
+\section{Threats to Validity}
+\label{sec:threats_validity}
+
+\subsection{Internal Validity}
+\label{subsec:internal_validity}
+
+The naively implemented optimisation strategies, and student-user restrictions around on-device shard-loading prevented full exploitation of GPUs to saturation. This likely overstates the negative impact of tensor-parallel scaling and understates batch size effects on energy efficiency. Similarly, quantisation’s effects are negatively signed, contradicting prior findings and suggesting a need for quantisation-aware deployment before evaluation \parencite{wu_training_2018, sinha_energy_2022}
+
+All experiments were conducted on a shared GPU cluster, where concurrent user workloads introduced uncontrolled variability in runtime, device utilisation, and system-level power draw. While temporal stratification, randomisation, repeated runs, and aggregation were employed to mitigate these effects, such measures offer only partial control over environmental noise. Moreover, the returned utilisation metrics do not isolate resource usage attributable to my experimental workloads, but instead reflect aggregate usage across all active processes on shared hardware. This lack of user-specific identification likely contributes to the anomalous patterns observed in the plotted relationships in Figure~\ref{fig:utilisation_grid}.
+
+\subsection{External Validity}
+\label{subsec:external_validity}
+
+The generalisability of reported findings are severely constrained. 
+
+This study evaluates only two relatively small, open-weight models on a four-GPUs A100 cluster, without inclusion of industry-standard optimisation techniques. These configurations do not represent API-gated frontier-scale deployments typical of commercial LLM services. For comparison, GPT-4 reportedly operates 8 ‘experts’ (component models) each of ~220B parameters (totalling $\approx$1.76T parameters) \parencite{howarth_number_2024}, while newer, more efficient accelerators such as NVIDIA H100s offer up to 3× higher FLOPs and substantially greater memory bandwidth \parencite{liang_holistic_2023}. Moreover, experiments rely on the standard PyTorch inference stack and Hugging Face’s \texttt{Accelerate} for orchestration; this omits the algorithmic optimisations and process control exposed in dedicated compilation toolchains such as vLLM, DeepSpeed, ONNX Runtime, or TensorRT. (By way of example, static batching was used to isolate the marginal effects of batch size, whereas dynamic/adaptive batching - an industry standard - would likely moderate and diminish observable batching effect sizes in production contexts, and perhaps even reverse the findings herein \parencite{samsi_words_2023, wilkins_hybrid_2024}; under static batching small (inefficient) batches are needed for low \textit{per-batch} latency (see Figure~\ref{fig:per_batch_latency}); however if we consider \textit{per-query} latency patterns, the opposite effect is seen Figure~\ref{fig:per_query_latency} - dynamic batching would support this dynamic.) As most production systems are baseline engineered to operate near their throughput-efficiency frontier, the naive baseline configurations here likely exaggerate the scope of achievable optimisation through deployment tuning.
+
+
+
+\begin{figure}[htbp!]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/per_batch_latency.png}
+    \caption{per-batch latency (static batching effects)}
+    \label{fig:per_batch_latency}
+  \end{subfigure}
+  
+  \vspace{1em}
+  
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/per_query_latency.png}
+    \caption{per-query latency (indicative of dynamic batching effects)}
+    \label{fig:latency_burstsize_3b}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Latency (per-batch/per-query) vs energy outcomes, by batch size. Indicating that with dynamic batching, large concurrent batch sizes would be optimal, with minimal tradeoffs involved.}
+  \label{fig:per_query_latency}
+\end{figure}
+
+
+At the same time, to preserve the constant FLOPs-per-token constraint, the study excludes multi-pass inference tasks such as chain-of-thought prompting, mixture-of-experts, retrieval-augmented generation, and self-consistency decoding - all of which alter both FLOP counts and runtime dynamics. These emerging use cases involve conditional computation paths and iterative reasoning loops, and may yield distinct efficiency profiles with potentially greater scope for energy improvement.
+
+These limitations cut in both directions. On one hand, the restricted search space and naive implementations likely understate the potential gains achievable via more sophisticated deployment strategies. On the other, the low baseline efficiency and simplified runtime environment likely overstate the marginal impact of individual parameters when generalised to well-optimised, production-grade systems. The latter effect is expected to strongly dominate.

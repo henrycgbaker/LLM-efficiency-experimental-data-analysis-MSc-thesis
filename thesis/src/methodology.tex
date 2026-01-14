@@ -1,0 +1,34 @@
+\section{Methodology}
+\label{sec:methodology}
+
+This study presents an empirical analysis of LLM inference-time efficiency, holding computational workload constant (ensuring fixed FLOPs-per-token) and measuring energy-per-token under a range of deployment configurations. The configuration space is explored through a within-model grid search, following \textcite{fischer_energy_2023}.
+
+The full experimental setup is defined by a task configuration $C$, and an execution environment $E$, where:
+\begin{align*}
+    C &= T \times D \times M &\text{(Task, Dataset, Model)}\\
+    E &= S \times A &\text{ (Software, Hardware)}
+\end{align*}
+
+The task ($T$) is held constant: a causal language modelling task with 500-token input and output sequences. Both are deterministically truncated to eliminate variation from sequence-length effects (which would constitute workload variation). The dataset ($D$) is a stratified subset of 128 prompts from Hugging Face’s \textit{AI Energy Score} benchmark corpus, sampled from WikiText (Wikipedia), OSCAR (web text), and UltraChat (conversational transcripts) \parencite{huggingface_aienergyscoretext_generation_2024}.
+
+The model ($M$) includes both architecture and configuration. Two models are evaluated - LLaMA 3.2–1B and 3B - representing lightweight, open-weight LLMs. Within each model, a grid search is conducted over selected parameters: tensor parallelism (1-4 GPUs), batch size (1-64 prompts), numerical precision and quantisation (FP32, FP16, INT8, INT4), decoder strategy and stochasticity (greedy, vanilla-multinomial, Top-$p$, Top-$k$), and simulated latency conditions (including delay severity, and constant vs bursty patterns). This is a non-exhaustive list of available implementation variables, selected based on (i) accessibility to LLM service providers, and (ii) prior evidence of energy effect size.
+
+$$ C = T \times D \times M  = 1 \times 1 \times (2 \times 1056)$$
+
+The execution environment ($E$) - encompassing both hardware ($A$) and software ($S$) - is also held constant. All experiments were run on ($A$) a shared single node server equipped with 4x NVIDIA A100-PCIE-40GB GPUs and 128x AMD EPYC 7742 64-core CPUs; running ($S$) Ubuntu Linux 20.04, with PyTorch 2.5.1 as the computational backend, orchestrated using Accelerate 1.4.0 launchers. A detailed description of the Python measurement package developed for this research is included in \nameref{appendix:python_package}.
+
+ $$ E = S \times A  = 1 \times 1 $$
+
+Thus an experiment $X$ is the 5 tuple (T, D, M, S, A):
+
+$$X = C \times E = 2112 \text{ configurations}$$
+    
+To mitigate environmental noise from operating on a shared server (e.g., fluctuating server load, thermal throttling), the full configuration space $X$ was executed two times across non-contiguous experimental cycles over separate weeks. Each cycle entailed a full traversal of $X$, with execution times staggered across days and hours to reduce temporal confounding. Runs were stratified by model and randomly sequenced to minimise ordering effects.
+
+Each run was initiated via a fresh command-line invocation of Hugging Face’s Accelerate launcher to fully reinitialise the distributed environment. Three dummy forward passes were used to trigger lazy initialisations (discarded from measurement), and a teardown protocol followed each run to clear all distributed states (caches, weights, and process groups) to prevent cross-run contamination. Failed runs were logged and retried up to three times before exclusion.
+
+Raw per-process metrics were logged at the batch level: energy consumption, power draw, GPU/CPU/RAM utilisation, and latency. These were aggregated to produce run-level metrics: total energy, average power, utilisation, memory allocation, tokens generated, and throughput. FLOPs were analytically estimated by run using a representative prompt, to validate constancy. Further derived metrics include: energy-per-token, FLOPs-per-token, tokens-per-joule, FLOPs-per-joule, token- and query-latency, and end-to-end throughput.
+
+While some recent works instrument node-level wattmeters to isolate low-level hardware effects \parencite{tripp_measuring_2024}, this study adopts a system-level perspective consistent with the benchmarking needs of LLM service providers and policymakers. As such, energy measurements were obtained via software profilers (CodeCarbon), reflecting the emerging standard in ML energy analysis. These tools offer ±10–15\% accuracy \parencite{anthony_carbontracker_2020, desislavov_trends_2023}.
+
+\newpage

@@ -1,0 +1,120 @@
+\documentclass[12pt, a4paper]{article}
+
+% Language setting
+\usepackage[english]{babel}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=3cm,bottom=4cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+%\textcite{beukeboom_linguistic_2017} jahr in klammern  \parencite{beukeboom_linguistic_2017} beides in klammern
+
+% necessary packages
+\usepackage{amsmath}
+\usepackage{endnotes}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage[table]{xcolor}
+\usepackage{makecell}
+\usepackage[doublespacing]{setspace}
+\usepackage[backend=biber, style=apa, natbib=true]{biblatex}
+\usepackage{csquotes}
+\usepackage{graphicx}
+\usepackage{subcaption}  % for subfigures
+\usepackage[section]{placeins}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\usepackage{xurl}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+\usepackage[utf8]{inputenc}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{pdflscape}
+\usepackage{listings}
+\usepackage{pdflscape}
+
+
+\usepackage{pdflscape} % To use landscape environment for wide tables
+\usepackage{array}      % For better column definitions
+\usepackage{booktabs}   % For professional table formatting
+\usepackage{amssymb} % Needed for \emptyset
+\usepackage{dirtytalk}
+
+\addtolength{\skip\footins}{2pc plus 5pt}
+\geometry{a4paper, margin=3cm}
+
+\renewcommand{\enoteformat}{%
+  \setlength{\parindent}{0pt}%
+  \setlength{\hangindent}{0pt}%
+  \makebox[0pt][r]{\makeenmark\ }%
+}
+
+% Fügt die Bibliographiedatenbank hinzu
+\addbibresource{references.bib}
+
+%\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+%\pagenumbering{gobble} % Unterdrückt die Seitenzahlen
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\pagenumbering{gobble}
+
+% Title Page
+\input{titlepage}
+
+\newpage
+
+% Executive Summary
+\begin{abstract}    
+    As Large Language Models (LLMs) proliferate across digital services, inference-time energy consumption has become a key sustainability concern. Efforts to characterise energy efficiency based on analytical compute metrics such as FLOPs, neglect downstream system implementation decisions and deployment pipelines that critically determine empirical energy costs
+
+    This study conducts a grid search over 2,112 configurations of LLaMA-3.2–1B and 3B models to empirically assess the energy effects of five deployment-level parameters: batching, numerical precision, decoder sampling, tensor parallelism, and latency conditions - all evaluated under a fixed computational workload on a shared GPU cluster. These parameters interact with measures of throughput and device utilisation, indicating that energy efficiency is partially determined by a given system's position relative to its throughput–efficiency frontier.
+
+    The comprehensive grid search revealed substantial variability in energy efficiency, with the most extreme cases ranging by up to 516.5-fold for the 1B model and 293.5-fold for the 3B model, corresponding to coefficients of variation of 127.7\% and 123.5\%, respectively. While these extreme figures cannot be interpreted as directly achievable gains in real-world production, building in some further assumptions, this study tentatively suggests unconstrained deployments might unrealistically achieve energy costs 10\%-15\% of those plausibly expected from the same model during typical production.
+
+    These findings support calls for standardised, end-to-end benchmarking frameworks that extend beyond static model metrics to capture full-stack implementations. Such benchmarks would equip policymakers and practitioners with actionable insights for deploying LLM services both effectively and sustainably.
+\end{abstract}
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\input{abbreviations}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pagenumbering{arabic}
+
+\input{problem_statement}
+\input{research_gap_question}
+\input{methodology}
+\input{related_work_research_design}
+\input{analysis_results}
+\input{discussion_results}
+\input{threats_to_validity}
+\input{future_work}
+\input{conclusion}
+
+\newpage
+
+\pagenumbering{roman}
+
+\input{appendixes}
+
+\addcontentsline{toc}{section}{References}
+\nocite{*}
+\printbibliography
+
+\include{authorship_statement}
+
+\end{document}

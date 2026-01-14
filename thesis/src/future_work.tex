@@ -1,0 +1,12 @@
+\section{Future Work}
+\label{sec:future_work}
+
+Future work should prioritise addressing external validity constraints by executing experiments on dedicated compute clusters, scaling to larger model families, and integrating production-grade inference frameworks. Such extensions would also support assessment of cross-hardware generalisability.
+
+Additionally, broader and deeper implementation-parameter coverage - such as load shaping, burst smoothing, dynamic power management, thermal- and cache-aware scheduling, token-aware routing, fine-grained sharding control, and pipeline parallelism, among others, warrant further investigation. Complementarily, finer-grained temporal analysis of power draw, device utilisation, and resource allocation dynamics is required to characterise instantaneous and cumulative energy behaviour more precisely.
+
+Relaxing the fixed-FLOPs constraint would permit statistical modelling of the conditional FLOPs-energy relationship, enabling analysis of how runtime, throughput, instantaneous power, and device utilisation jointly determine energy outcomes. It would also allow inclusion of multi-pass inference regimes into the analysis. The input-dependent execution paths of these conditional computing architectures opens avenues for data-centric profiling of prompt complexity, structural uncertainty, and reasoning depth - all critical for considering the design of energy benchmarking datasets.
+
+Finally, integrating these findings with sustainable systems research and life-cycle assessment (LCA) models would situate inference energy use within a broader environmental impact framework.
+
+\newpage

@@ -1,0 +1,23 @@
+\section{Paper Positioning}
+\label{sec:paper_positioning}
+
+\subsection{Research Gap}
+\label{subsec:resaeach_gap}
+
+Despite increasing attention to the environmental costs of AI, there remains a significant empirical gap in understanding the joint effects of deployment-phase decisions on LLM inference-time energy consumption. This research integrates previously fragmented technical insights into a coherent policy-oriented framework that highlights implications for standardising LLM energy benchmarking. In doing so, it exposes the cumulative - and occasionally interactive - energy effects of decisions made during system deployment. 
+
+By identifying parameters that influence inference-time energy efficiency independently of FLOPs, this study proposes a minimum initial set of controls for future energy benchmarking efforts. Within the defined search space it demonstrates the degree of variation in energy outcomes possible for a given FLOP-count; and by further simulating a series of implementation scenarios, it underscores the fragility of recent FLOP-based benchmarking proposals and the need for more granular policy attention to the energy trade-offs embedded in deployment decisions.
+
+
+\subsection{Research Question}
+\label{subsec:resaeach_question}
+
+This study investigates how inference-time energy efficiency varies with changes to a pre-identified set of readily-accessible deployment-time parameters, asking:
+
+\begin{quote}
+\textit{How do implementation decisions affect empirical energy consumption during LLM inference}?
+\end{quote}
+
+Focusing on batch size, tensor parallelism, numerical precision, decoder sampling, and latency conditions, the study shows that even with fixed theoretical computational workloads, actual energy costs can vary substantially.
+
+\newpage

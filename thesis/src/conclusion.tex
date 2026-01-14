@@ -1,0 +1,10 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+This study addresses a critical empirical gap regarding the impact of deployment-level decisions on LLM inference-time energy efficiency. It demonstrates that analytic FLOPs-based metrics inadequately represent actual energy usage, failing to capture significant variation induced by practical implementation choices. Experimental results from controlled parameter variations - including batch size, tensor parallelism, numerical precision, decoding strategy, and simulated latency - reveal substantial intra-model variability in energy efficiency, consistent across models. Particularly, batch sizing and tensor parallelism showed marked energy-efficiency sensitivity; in contrast, numerical precision demonstrated efficiency gains to be dependent on backend integration, while decoder strategies exhibited minimal direct impacts.
+
+The study further emphasises that throughput and device utilisation metrics - routinely captured in industry contexts - offer useful empirical indicators for evaluating and diagnosing deployment (in)efficiency. Integrating system-level metrics sensitive to both architectural and operational factors into benchmarking, shifts the focus from abstract model comparisons to practical, holistic evaluation of deployed systems. This whole-system perspective mitigates the risk of misleading efficiency claims and aligns benchmarking practices with wider \textit{Green AI} objectives. The results herein clearly indicate a risk of distorted efficiency claims arising from standalone reliance on convenient analytical proxies and underline the necessity for standardised empirical benchmarks reflecting realistic operational conditions.
+
+Future research should expand on these findings by incorporating larger model scales, dedicated infrastructure, and production-grade inference frameworks. Moreover, a broader exploration of deployment parameters and finer-grained analyses of power and utilisation dynamics would enrich benchmarking precision, ultimately contributing to more sustainable and informed LLM deployments.
+
+\newpage

@@ -1,0 +1,473 @@
+\section{Analysis of Results}
+\label{sec:analysis_results}
+
+\begin{figure}[htbp!]
+  \centering
+  % first subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/histogram.png}
+    \label{fig:histogram}
+ \end{subfigure}
+
+  % second subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/boxplot.png}
+    \label{fig:boxplot}
+  \end{subfigure}
+  \caption{Distribution of grid search energy outcomes}
+  \label{fig:hist_box}
+\end{figure}
+
+\begin{table}[ht]
+\centering
+\begin{subtable}[t]{0.9\textwidth}
+  \centering
+  \begin{tabular}{lccc}
+    \toprule
+    Model & $\mu$ (kWh/token) & $\sigma$ (kWh/token) & CV (\%) \\
+    \midrule
+    1B     & $1.44\times10^{-6}$ & $1.84\times10^{-6}$ & 127.7 \\
+    3B     & $2.64\times10^{-6}$ & $3.26\times10^{-6}$ & 123.5 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Mean, standard deviation, and coefficient of variation.}
+  \label{tab:energy_core_stats}
+\end{subtable}
+
+\vspace{2em}
+
+\begin{subtable}[t]{0.9\textwidth}
+  \centering
+  \begin{tabular}{lcccc}
+    \toprule
+    Model & max/min fold & 95/5 fold & \% reduction & 95/5 \% reduction \\
+    \midrule
+    1B     & 516.5× & 61.0× & 99.8\% & 98.4\% \\
+    3B     & 293.5× & 51.0× & 99.7\% & 98.0\% \\
+    \bottomrule
+  \end{tabular}
+  \caption{Fold-change and percent-reduction statistics.}
+  \label{tab:energy_fold_stats}
+\end{subtable}
+
+\caption{Energy outcomes summary for 1B and 3B models: (a) core variability metrics; (b) fold-change and reduction metrics.}
+\label{tab:energy_stats}
+\end{table}
+
+
+
+Systematic variation of implementation parameters reveals substantial intra-model variability in inference-time energy efficiency under a fixed FLOPs constraint. As shown in Figure~\ref{fig:hist_box}, both models exhibit positively skewed energy outcome distributions, with long right tails capturing high-energy outliers. While the two models show considerable overlap in their energy profiles - highlighting that deployment choices can outweigh architectural complexity - the 3B model incurs a higher median energy-per-token (reflecting its greater computational and memory demands) and exhibits larger absolute variance. However, when normalised by each model’s mean, the 1B model’s coefficient of variation is computed at 127.7\%, compared with 123.5\% for the 3B model. Likewise, while the 1B model’s absolute maximum/minumum spread is almost 60\% wider than the 3B, its clipped 95/5-percentile fold-change (61-fold, against 51-fold for the 3B model), indicates that in relative terms smaller models can be just as (if not more) sensitive to implementation-level decisions. (See Table \ref{tab:energy_stats} for full details.)
+
+\begin{tcolorbox}
+    \textbf{Note:} For the following plots visualising variation associated with each implementation parameter, one-standard-deviation intervals are computed from the full grid-search results. These intervals are calculated across repeated runs, capturing both (minor) measurement noise, and the total (major) observed variation in energy-per-token across all configurations at that parameter value (including interactions with other settings).
+\end{tcolorbox}
+
+\subsubsection{Tensor Parallelism}
+\label{subsubsec:tensor_parallelism}
+
+\begin{figure}[htbp!]
+  \centering
+  % first subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/num_proc_abs.png}
+    \caption{Absolute values}
+    \label{fig:num_proc_abs}
+  \end{subfigure}
+  
+  \vspace{1em}  % vertical space between subfigures
+  
+  % second subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/num_proc_norm.png}
+    \caption{Normalised}
+    \label{fig:num_proc_norm}
+  \end{subfigure}
+  
+  \caption{Tensor parallelism (number of processes) vs energy outcomes}
+  \label{fig:num_proc}
+\end{figure}
+
+As shown in Figure~\ref{fig:num_proc}, increasing the number of processes over which model layers are distributed leads to a moderately super-linear increase in energy-per-token. Degree of tensor distribution has the largest effect of all tested parameter, with both models more than doubling with the addition of a single extra process, then scaling up to 4x and 6x under 3 and 4 processes respectively. Both model's variance in energy outcomes across the entire grid search also grows with parallelism, reflecting both scale and increased instability and interaction effects under communication-heavy, fragmented scheduling.
+
+This behaviour reflects a naive unoptimised implementation of tensor parallelism and is consistent with known limitations when model size is small relative to available GPU capacity. As (underutilised) GPUs are added, not only does another device need powering, but additionally energy overheads from inter-device communication and coordination increase disproportionately to realised throughput gains - hence the moderately super-linear pattern. This is supported by Figures~\ref{fig:num_proc_throughput_abs} \& ~\ref{fig:num_proc_throughput_norm}, which shows no meaningful increase in throughput as parallelism increases, and further confirmed in the moderating effect of increasing batch size on parallelism (Figure~\ref{fig:num_proc_x_batching}) - which by increasing throughput and improving device utilisation partially offset these efficiency losses. 
+
+Leveraging more sophisticated parallel execution strategies would likely alter the scaling dynamics observed in these experiments, flattening the energy-efficiency curves and shifting the throughput-efficiency frontier outward.
+
+\subsubsection{Batch Size}
+\label{subsubsec:batch_size}
+
+\begin{figure}[htbp!]
+  \centering
+  % first subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/batching_abs.png}
+    \caption{Absolute values}
+    \label{fig:batching_abs}
+  \end{subfigure}
+  
+  \vspace{1em}  % vertical space between subfigures
+  
+  % second subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/batching_norm.png}
+    \caption{Normalised}
+    \label{fig:batching_norm}
+  \end{subfigure}
+  
+  \caption{Batch size vs energy outcomes}
+  \label{fig:batching}
+\end{figure}
+
+\begin{figure}[htbp!]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/num_proc_x_batch.png}
+    \caption{Batch size $\rightarrow$ number of processes}
+    \label{fig:num_proc_x_batching}
+  \end{subfigure}
+
+  \vspace{1em}
+
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/batch_x_num_proc.png}
+    \caption{Number of processes $\rightarrow$ batch size}
+    \label{fig:batch_x_num_proc}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Interaction effects between degree of tensor parallelisation and batch size}
+  \label{fig:proc_batch_interaction}
+\end{figure}
+
+Figure~\ref{fig:batching} reveals a steep inverse relationship between batch size and energy-per-token: in the small-batch regime, fixed overheads dominate, while beyond a certain point the curve plateaus, reflecting compute and memory-bandwidth saturation. The lower bound is reached for both models at around 10\% of the double-batch baseline (so a range of 10x, excluding input single batches). Likewise, Figures~\ref{fig:batch_throughput_abs} and~\ref{fig:batch_throughput_norm} show energy-per-token falling as throughput rises, demonstrating that batching-driven efficiency gains stem primarily from throughput improvements. This throughput-sensitivity is further evidenced by the moderation effect of tensor parallelism (here a proxy for per-device utilisation) in Figure~\ref{fig:proc_batch_interaction}.
+
+\subsubsection{Numerical Precision}
+\label{subsubsec:numerocal_precision}
+
+Energy-per-token does not decrease monotonically with precision reductions (Figure~\ref{fig:precision}). Transitioning from FP32 to mixed FP16 yields energy efficiency gains of 35-40\% for both models, consistent with findings by \textcite{narang_mixed_2018} and \textcite{he_campo_2022}. However, the efficiency losses of 5-10\% across the quantised models suggest that realised energy savings from quantisation is conditional on backend-level integration \parencite{alizadeh_green_2024, yang_double-exponential_2024}.
+
+\begin{figure}[htbp!]
+  \centering
+  % first subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/precision_abs.png}
+    \caption{Absolute values}
+  \end{subfigure}
+  
+  \vspace{1em}  % vertical space between subfigures
+  
+  % second subfigure
+  \begin{subfigure}[b]{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/precision_norm.png}
+    \caption{Normalised}
+  \end{subfigure}
+  
+  \caption{Numerical precision vs energy outcomes}
+  \label{fig:precision}
+\end{figure}
+
+
+\subsubsection{Decoding Strategy}
+\label{subsubsec:decoding_strategy}
+
+Within-mode variation yielded little of substantive interest, with no discernible pattern from varying values of $k$ (Figure~\ref{fig:decoder_topk_grid_intext}) and $p$ (Figure~\ref{fig:decoder_topp_grid_intext}) across all temperature levels. Larger, more legible plots are included in \nameref{appendix:decoder_plots}.
+
+Between-mode variation exhibited clear, albeit minor, differences - with all curves remaining within 5\% of the baseline (Figure~\ref{fig:decoder_temp_grid}). Greedy decoding - at temperature 0, where all modes converge by definition - exhibited lowest energy-per-token costs, except for certain vanilla-multinomial sampling values in the 3B model (likely an artifact; of little substantive interest). For all sampling strategies, there was no obvious trend across temperature values after the initial dispersion from the greedy baseline; of the stochastic strategies, vanilla-multinomial sampling was most efficient, followed by Top-$k$, then Top-$p$ - consistent with algorithmic expectations. 
+
+\begin{figure}[htbp!]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  % Row 1: 1 B decoder
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topk_abs_1b.png}
+    \caption{1B (absolute)}
+    \label{fig:decoder_topk_abs_1b}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topk_norm_1b.png}
+    \caption{1B (normalised)}
+    \label{fig:decoder_topk_norm_1b}
+  \end{subfigure}
+
+  \vspace{1em}  % gap between rows
+
+  % Row 2: 3 B decoder
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topk_abs_3b.png}
+    \caption{3B (absolute)}
+    \label{fig:decoder_topk_abs_3b}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topk_norm_3b.png}
+    \caption{3B (normalised)}
+    \label{fig:decoder_topk_norm_3b_intext}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Top–$k$ within-mode energy outcomes}
+  \label{fig:decoder_topk_grid_intext}
+\end{figure}
+
+
+\begin{figure}[htbp!]
+  \centering
+  %% Row 1: Top-p absolute
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topp_abs_1b.png}
+    \caption{1B (absolute)}
+    \label{fig:topp_abs_1b}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topp_abs_3b.png}
+    \caption{3B (absolute)}
+    \label{fig:topp_abs_3b}
+  \end{subfigure}
+
+  \vspace{1em}  % gap between rows
+
+  %% Row 2: Top-p normalised
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_top_norm_1b.png}
+    \caption{1B (normalised)}
+    \label{fig:topp_norm_1b_intext}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_topp_norm_3b.png}
+    \caption{3B (normalised)}
+    \label{fig:topp_norm_3b_intext}
+  \end{subfigure}
+
+  \caption{Top-$p$ within-mode energy outcomes}
+  \label{fig:decoder_topp_grid_intext}
+\end{figure}
+
+
+\begin{figure}[htbp!]
+  \centering
+  %–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  % Row 1
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_1b_abs.png}
+    \caption{1B absolute}
+    \label{fig:decoder_1b_abs}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_3b_abs.png}
+    \caption{3B absolute}
+    \label{fig:decoder_3b_abs}
+  \end{subfigure}
+
+  \vspace{1em}  % vertical gap between rows
+
+  % Row 2
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_1b_norm.png}
+    \caption{1B normalised}
+    \label{fig:decoder_1b_norm}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/decoder_3b_norm.png}
+    \caption{3B normalised}
+    \label{fig:decoder_3b_norm}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Comparison of between decoder-mode energy outcomes.}
+  \label{fig:decoder_temp_grid}
+\end{figure}
+
+
+\subsubsection{Simulated Latency Conditions}
+\label{subsubsec:decoding_strategy}
+
+Figures \ref{fig:latency_burstsize_comparison} and \ref{fig:latency_burstinterval_comparison} show that energy efficiency steadily degrades as simulated latency increases, with larger declines under bursty conditions - albeit with modest overall effect sizes. Because this latency models exogenous communication delays (network congestion or scheduling jitter) rather than compute bottlenecks, the efficiency loss reflects reduced throughput: GPUs remain powered longer but perform less useful work per unit time. In the 1B model, this decline is linear and monotonic (Figures \ref{fig:latency_burstsize_1b} and \ref{fig:latency_burstinterval_1b}); in the 3B model (Figures \ref{fig:latency_burstsize_3b} and \ref{fig:latency_burstinterval_3b}), the curve is more irregular, likely due to more interactions among device utilisation, memory access patterns, and synchronisation overhead at higher compute intensity.
+
+\begin{figure}[htbp!]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/latency_burstsize_1b_norm.png}
+    \caption{1B}
+    \label{fig:latency_burstsize_1b}
+  \end{subfigure}
+  
+  \vspace{1em}
+  
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/latency_burstsize_3b_norm.png}
+    \caption{3B}
+    \label{fig:latency_burstsize_3b}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Delay interval vs energy outcomes, by burst size.}
+  \label{fig:latency_burstsize_comparison}
+\end{figure}
+
+\begin{figure}[htbp!]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/latency_burstinterval_1b_norm.png}
+    \caption{1B }
+    \label{fig:latency_burstinterval_1b}
+  \end{subfigure}
+  
+  \vspace{1em}
+  
+  \begin{subfigure}[b]{0.8\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/latency_burstinterval_3b_norm.png}
+    \caption{3B}
+    \label{fig:latency_burstinterval_3b}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{Delay interval vs energy outcomes, by burst interval.}
+  \label{fig:latency_burstinterval_comparison}
+\end{figure}
+
+
+Burstiness further exacerbates energy and throughput inefficiency. Longer burst intervals degrade throughput and increase energy cost (Figure~\ref{fig:latency_burstinterval_comparison}),  however the relationship between burst structure and energy use is not uniform. On this model-hardware setup, smaller burst sizes (5 or 8 queries) exhibit consistently higher inefficiencies, whereas larger bursts (10 or 20 queries) resemble constant latency efficiency profiles (Figure~\ref{fig:latency_burstsize_comparison}). In line with findings by \textcite{stojkovic_towards_2024, stojkovic_dynamollm_2024}, this suggests modern GPUs exploit burst-locality to regain uninterrupted stretches of computation, effectively treating larger bursts as pseudo-batches.
+
+\subsubsection{Throughput \& Device Utilisation}
+\label{subsubsec:throughput_device_utilisation}
+
+Prior work has considered the role of throughput and device utilisation rates in determining inference-time energy efficiency \parencite{fischer_energy_2023, samsi_words_2023, yang_double-exponential_2024}. Routinely monitored in production environments, these metrics serve as system- and device-level indicators of runtime efficiency, capturing how effectively compute is translated into useful output. This study suggests extending that logic, proposing that together they capture computational and non-computational aspects of energy efficiency in deployed LLM systems.
+
+A system's overall throughput capacity is a function of model architecture (e.g., layer depth, kernel operations, memory access patterns), hardware constraints, and implementation decisions \parencite{fischer_energy_2023}. Within this capacity, the observed throughput rate characterises the \textit{realised} productivity of a system. The distance between the two governs key energy-performance trade-offs for the system as a whole.
+
+In contrast, device utilisation indicates how closely specific hardware modules are operating to their respective performance ceilings - offering practical diagnostics of system bottlenecks.
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/throughput_vs_energy.png}
+    \caption{Throughput vs energy outcome}
+    \label{fig:throughput_vs_energy}
+\end{figure}
+
+While this study does not formalise the precise functional form of the interactions between device utilisation, power draw, system throughput capacity, throughput rate, and energy costs (an area of open research), Figure~\ref{fig:throughput_vs_energy} illustrates that for systems characterised by throughput-inefficiency (operating at low throughput, within their throughput-power pareto frontier) small increases yield large reductions in energy‐per‐token. Beyond an inflection point — indicating proximity to the system’s throughput‐efficiency frontier — further throughput gains no longer improve energy efficiency, but instead require proportionate increases in power draw. This convex non-linearity allows the optimal throughput configuration set to be conceptualised as a constrained optimisation problem under SLO conditions \parencite{samsi_words_2023, stojkovic_dynamollm_2024}.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/batch_throughput_abs.png}
+    \caption{Batch size (absolute)}
+    \label{fig:batch_throughput_abs}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/batch_throughput_norm.png}
+    \caption{Batch size (normalised)}
+    \label{fig:batch_throughput_norm}
+  \end{subfigure}
+
+  \vspace{1em}
+
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/precision_throughput_abs.png}
+    \caption{Precision (absolute)}
+    \label{fig:precision_throughput_abs}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/precision_throughput_norm.png}
+    \caption{Precision (normalised)}
+    \label{fig:precision_throughput_norm}
+  \end{subfigure}
+
+  \vspace{1em}
+
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/num_proc_throughput_abs.png}
+    \caption{Num.\ of procs (absolute)}
+    \label{fig:num_proc_throughput_abs}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/num_proc_throughput_norm.png}
+    \caption{Num.\ of procs (normalised)}
+    \label{fig:num_proc_throughput_norm}
+  \end{subfigure}
+
+  \caption{$y_1$-energy‐per‐token; $y_2$-throughput, for three implementation parameters. The changing relationship between energy and throughput in each reflects the changing trade‐offs as the system transitions from a throughput‐inefficient to a throughput‐efficient regime. Larger plots in \nameref{appendix:throughput_plots}.}
+  \label{fig:throughput_grid}
+\end{figure}
+
+In the throughput‐inefficient regime (below the frontier), configurations that increase throughput - such as larger batch sizes (Figures~\ref{fig:batch_throughput_abs}, \ref{fig:batch_throughput_norm}) or lower precision (Figures~\ref{fig:precision_throughput_abs}, \ref{fig:precision_throughput_norm}) - yield substantial energy‐per‐token improvements. By contrast, adding more GPUs (Figures~\ref{fig:num_proc_throughput_abs}, \ref{fig:num_proc_throughput_norm}) shows little benefit until the system is already operating near peak utilisation. Optimising system implementation and scaling carry throughput-sensitive dynamics.
+
+\begin{figure}[htbp!]
+  \centering
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+  \begin{subfigure}[b]{0.65\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/batch_utilisation_norm.png}
+    \caption{Batch size}
+    \label{fig:batch_util_norm}
+  \end{subfigure}
+  
+  \vspace{1em}
+  
+  \begin{subfigure}[b]{0.65\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/num_proc_utilisation.png}
+    \caption{Tensor parallelism}
+    \label{fig:num_proc_util}
+  \end{subfigure}
+
+\vspace{1em}
+    
+  \begin{subfigure}[b]{0.65\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/precision_utilisation_norm.png}
+    \caption{Numerical precision}
+    \label{fig:precision_util_norm}
+  \end{subfigure}
+  %––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––%
+
+  \caption{$y_1$-energy outcomes; $y_2$-device-utilisation, vs three implementation parameters.}
+  \label{fig:utilisation_grid}
+\end{figure}
+
+By contrast, Figure~\ref{fig:utilisation_grid} demonstrates that per-device utilisation captures a different set of non-computational inefficiencies that pull performance inside the efficiency frontier. In efficient deployments, utilisation should remain consistently high; persistent underutilisation indicates specific sources of energy waste - as is often the case in deployed systems where utilisation rates have been reported as low as 23–27\% \parencite{samsi_words_2023}. 
+
+The utilisation data collected here - measured at the device-level in a shared server environment - are noisy and reflect aggregate activity across concurrent users, so over-interpretation is avoided. Nevertheless, it is of note that the negatively-signed relationship between utilisation and increased numerical precision in Figure~\ref{fig:precision_util_norm} is surprisingly consistent - even when energy and throughput increased under quantisation - reinforcing that realised quantisation-related energy savings are conditional on backend integration. Figure~\ref{fig:batch_util_norm}'s lack of a clear utilisation-energy relationship in the low batch regime (where communication bottlenecks dominate) also reinforces that high utilisation is a practical diagnostic and a necessary-but-not-sufficient condition for efficient inference.
+
+From a policy perspective, throughput and device utilisation offer more insightful characterisation of runtime energy dynamics than analytical metrics such as FLOPs, and a deployment-sensitive basis for benchmarking deployed systems. These metrics are routinely logged in production, integrate both architectural and operational factors, and support systematic comparison across LLM deployments. Moreover, better understanding of the topology of a system’s throughput and its determinants (an area of open research), supports \textit{Green AI}-aligned technical research.
+
+\newpage

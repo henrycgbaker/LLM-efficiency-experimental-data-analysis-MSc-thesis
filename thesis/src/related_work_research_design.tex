@@ -1,0 +1,102 @@
+\section{Related Work \& Research Design}
+\label{sec:related_work_research_design}
+
+\subsection{Batching}
+\label{subsec:batching}
+
+One well-documented lever for improving inference-time energy efficiency is batching strategy. Batching of input queries improves energy efficiency by amortising fixed overheads, parallelising memory and compute operations, and maximising utilisation of the GPU’s streaming multiprocessors. This reduces idle time between operations and pushes the device closer to its thermal design power (TDP) \parencite{yang_double-exponential_2024}.
+
+Both empirical investigations \parencite{mavromatis_computing_2024, stojkovic_towards_2024, yang_double-exponential_2024} and more theoretically-oriented modeling efforts \parencite{cai_neuralpower_2017} consistently demonstrate that energy consumed per sample decreases as batch size increases - up to a saturation point beyond which efficiency gains plateau. 
+
+The dominant mechanism by which batching (and other implementation-level optimisations) affects energy efficiency is through improving system throughput - the rate at which output tokens are generated - relative to power draw. 
+ 
+$$\text{Throughput} = \frac{\text{Total output tokens}}{\text{Total inference time}}$$
+
+The full extent of the interactive relationships between throughput, instantaneous power draw, device utilisation and energy-efficiency is complex, conditional, and sometimes ambiguously-signed (and out of scope of this analysis). However, with respect to batching, \textcite{yang_double-exponential_2024} find that increasing batch size drives up average GPU power usage, but improves energy per input - as more work is completed in less time with fewer wasted cycles. Higher power corresponds to greater energy efficiency, conditional that it reflects reduced latency and higher throughput. The optimal batch size often lies just below the point of full GPU utilisation.
+
+Batching is thus a necessary implementation control for FLOPs to be considered a meaningful indicator of energy-efficiency. \textcite{henderson_towards_2020} found FLOPs to be uncorrelated with energy when using a batch size of one, whereas later work \parencite{yang_double-exponential_2024} highlighted that unbatched inference leaves the GPU under-utilised, distorting the FLOPs-energy relationship and biasing comparisons in favour of larger models.
+
+In practice, batching is constrained by latency requirements. Smaller, energy-inefficient batches are required to meet SLOs in low-latency interactive applications, resulting in a tradeoff \parencite{samsi_words_2023}. Production systems therefore use dynamic or continuous batching (temporally aggregating concurrent user requests) to increase utilisation without breaching latency budgets. Yet inefficient batching and request scheduling remain persistent sources of energy waste in deployed LLM services \parencite{stojkovic_dynamollm_2024, stojkovic_tapas_2025, stojkovic_towards_2024}. A well-calibrated batching strategy must consider both the implemented model’s throughput characteristics and the underlying hardware’s utilisation limits. This trade-off between energy efficiency and latency performance is invisible to naive analytically-determined proxies.
+
+In this study, I adopt fixed, statically defined batches to isolate the marginal effect of batch size and eliminate confounding from real-time scheduling variability. Batch sizes are systematically varied from single-request inference up to 64 inputs.
+
+\subsection{Numerical Precision \& Quantisation Effects}
+\label{subsec:precision}
+
+Modern accelerators support lower-precision arithmetic modes (FP16, BF16, INT8, INT4). Cutting per-operation bit requirements reduces memory bandwidth demands and enables faster execution with lower power draw. As with batching, reducing numerical precision increases energy efficiency principally by increasing arithmetic throughput relative to power draw. 
+
+\textcite{narang_mixed_2018} report that switching to mixed-precision training (FP16) yields substantial energy savings, with \textcite{he_campo_2022} reporting efficiency improvements of up to 24.2\%. \textcite{sinha_energy_2022} find that post-training quantisation to ultra-low-bit formats (INT8 and INT4) further reduced power draw by 20–60\% and lowered thermal footprints by 2–20°C, while \textcite{wu_training_2018} report energy savings of up to 5× against a full precision baseline. These improvements are conditional on underlying framework-level optimisations that more effectively map integer operations to hardware-accelerated kernels \parencite{alizadeh_green_2024}.
+
+However, reduced precision is not without trade-offs, with marginal energy gains from more aggressive quantisation diminishing, accompanied by greater risk of degraded model performance. Without careful calibration or quantisation-aware fine-tuning, ultra-low-precision deployment can impair key metrics such as perplexity, latency, and output reliability \parencite{latotzke_post-training_2022, yao_zeroquant-v2_2023}. Once again, this trade-off between energy efficiency and acceptable performance degradation is invisible to naive analytically-determined efficiency metrics.
+
+In this study, I evaluate four precision formats: FP32, FP16, INT8, and INT4. The floating-point models are executed using native support in PyTorch, while integer quantisation is applied post-training using the ‘bitsandbytes’ library on pre-trained Hugging Face model checkpoints.
+
+\begin{tcolorbox}
+\textbf{NB}: There is a lack of consensus on how to compute FLOPs for quantised models \parencite{yao_zeroquant-v2_2023}. Integer operations (IntOps) differ fundamentally from floating-point operations in both execution and representation, and quantisation may also alter the computation graph via kernel fusion or reordered memory access patterns. Therefore, interpreting IntOps as direct FLOP-equivalents is technically inaccurate. Nevertheless, to maintain comparability across configurations, this study treats FLOPs-per-token as constant for all precisions, and treats precision as an ordinal axis (from FP32 to INT4).
+\end{tcolorbox}
+
+\subsection{Decoder Sampling Strategy}
+\label{subsec:decoder}
+
+While a (decoder-based) model’s static computation graph determines the primary computational cost of inference, the choice of decoding strategy can subtly influence per-token energy costs. This dimension remains underexplored in the empirical literature, yet there are algorithmic grounds to expect small but non-negligible effects.
+
+Production deployments typically choose between greedy decoding (argmax), beam search (parallel forward passes), and stochastic sampling (vanilla-multinomial, Top-$k$, Top-$p$). The latter sampling-based methods alter how the next token is selected from the model’s output logits without changing the core forward pass; by contrast, beam search incurs multiple forward passes per generation step, scaling roughly linearly with beam width $b$. To maintain the design constraint of fixed FLOPs-per-token, beam search is excluded from this study, though it would be expected to exhibit the highest energy costs among common decoding strategies.\footnote{As shown by \textcite{poddar_towards_2025}, the primary energy effect of stochastic decoding strategies arises indirectly, through increases in output length and generation time under variable stopping criteria. Similarly, Luccioni et al. (2024) find prompt content to have minimal impact on energy cost aside from through output length. However, to isolate per-token efficiency effects arising from intrinsic differences in decoder runtime and sampling overhead, and to preserve a fixed FLOPs-per-token basis for comparability, all outputs in this study are deterministically truncated to 500 tokens. This approach blocks (dominant) length-induced energy variation.}
+
+In all decoding modes considered here, each token still requires one full forward pass. Observed variation in energy stems from lightweight differences in the post-logit sampling overheads: respectively sampling from either the $k$ most probable tokens, or from the smallest set of tokens whose cumulative probability equals or exceeds $p$ (nucleus-decoding). These post-processing differences represent second-order effects relative to core matrix-multiplication inference costs, nevertheless they do introduce variation in runtime and memory access patterns. By highlighting greater numbers of required arithmetic and memory-transfer operations for a given token count, algorithmic complexity offers an approximation for a theoretical understanding of the energy effects of decoding overheads. Greedy decoding has the lowest complexity in selecting the argmax logit in $O(V)$; vanilla-multinomial sampling also has $O(V)$ complexity but requires random number generation and more irregular access; Top-$k$ decoding requires sorting and truncating the logits in $O(V + k \log k)$; and Top-$p$ introduces cumulative probability computations and sorting in $O(V \log V)$, and is associated with higher memory access irregularity and cache churn \parencite{holtzman_curious_2020}.
+
+Empirical evidence on the energy cost of these decoding strategies is sparse. In the only dedicated study located, Nik et al. (2025, preprint) report Top-$k$ ($k=50$) to have +10–15\% additional energy costs per token (relative to greedy); Top-$p$ ($p=0.9$) to have +20–25\%; and Beam search ($b=5$) to evaluate to approximately 4× the energy costs of greedy. Beyond this, no peer-reviewed work has empirically measured per-token energy by decoding strategy, with most studies focusing instead on latency or FLOP-based cost approximations. 
+
+In this study, I conduct a hierarchical grid search over three decoder parameters: temperature, $k$, and $p$. To save resources I do not conduct a full grid search between decoder parameters with other variables, but take a fixed configuration point (given by \nameref{appendix:base_config}) implemented with greedy decoding (temperature $\approx 0$), then for each temperature variation, I evaluate vanilla-multinomial sampling alongside all specified Top-$k$ and Top-$p$ configurations. Parameter bounds were selected to encompass and slightly exceed standard production defaults:
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{} c c c c @{}}
+    \toprule
+    \makecell[c]{\bfseries Decoder\\Parameter}
+      & \makecell[c]{\bfseries Evaluated\\Range}
+      & \makecell[c]{\bfseries Production\\Standard}
+      & \makecell[c]{\bfseries Reference} \\
+    \midrule
+    Temperature
+      & 0 – 1.4
+      & 0.7 – 1.0
+      & \parencite{singh_guide_2023} \\
+    $k$
+      & 0 – 500
+      & 40 – 100
+      & \parencite{singh_guide_2023} \\
+    $p$
+      & 0.1 – 0.98
+      & 0.8 – 0.95
+      & \parencite{openai-developer-community_temperature_2023} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Decoder‐parameter evaluation ranges and production standards.}
+  \label{tab:decoder-params}
+\end{table}
+
+\subsection{Tensor Parallelism \& GPU Resource Allocation}
+\label{subsec:parallelism}
+
+Serving large LLMs at scale necessitates distributed inference architectures, typically implemented through tensor parallelism, pipeline parallelism, and GPU multiplexing. Tensor and pipeline parallelism distribute the model’s computation and memory footprint across multiple GPUs (either within- or across-nodes) while multiplexing executes multiple model instances concurrently on a shared device(s) \textcite{weng_mlaas_2022}. The literature on distributed computing and data-centre systems engineering focuses on efficiently managing these processes through low-level runtime strategies - such as scheduling algorithms and dynamic sharding - that optimise throughput and memory contention, to scale inference across large heterogeneous GPU clusters \parencite{samsi_words_2023}.
+
+While the primary engineering objective of parallelism is to support ‘efficient’ serving (with respect to latency and scale) of large models under high demand, with regards to energy consumption it matters how computation is distributed across the system. These second-order energy implications are conditional: on the one hand, parallelism can increase throughput by distributing workload more evenly across devices; on the other, it can introduce communication and synchronisation overheads in the form of collective barriers, inter-device data transfers, and attention cache exchanges \parencite{li_miso_2022}. Parallelism's net energy impact depends on the system’s position relative to its throughput-efficiency frontier \parencite{yang_double-exponential_2024}. 
+
+Additional system-level characteristics such as memory access patterns, GPU-device partitioning, cache locality, and hardware heterogeneity, further influence distributed inference’s energy profile \parencite{tripp_measuring_2024, weng_mlaas_2022}. To mitigate these overheads, modern data-centres employ granular GPU sharing and context-switching mechanisms, such as NVIDIA’s Multi-Instance GPU (MIG) and Multi-Process Service (MPS) to improve device-level utilisation and lower energy costs \parencite{wilkins_hybrid_2024, li_miso_2022}. However, this study adopts a naïve tensor parallelism scheme for experimental tractability, whereby available GPUs are treated as a single homogeneous cluster, and the number of cores exposed to the distributed environment is systematically varied. This omits industry-standard inference frameworks (e.g. vLLM, DeepSpeed, TensorRT, ONNX) that provide advanced parallelism and fine-grained execution control.
+
+\subsection{Latency Constraints and Power Management}
+\label{subsec:latency}
+
+Latency management is critical for deployed LLMs, especially in SLO-bound interactive applications such as chatbots. Optimising a given system towards common deployment metrics such as Time-to-First-Token (TTFT), Time-Between-Tokens (TBT), and system-level throughput (tokens-per-second), typically involves making tradeoffs against energy efficient implementations.
+
+Latency constraints arise from two distinct sources (computational/service) vs communication/wait delay). Decomposing latency management into constituent subproblems highlights their distinctive constraining dynamics, and the associated tradeoffs in reducing each. 
+
+Computational latency is inherent to the inference workload itself, reflecting limits in arithmetic throughput and memory bandwidth. Its reduction involves aggressive scheduling and smaller (energy-inefficient) batch sizes, driving GPUs towards alternating between bursts of high power usage and underutilisation - both energy inefficient states \parencite{henderson_towards_2020}. Strategies like power-capping and dynamic voltage-frequency scaling (DVFS; more common in CPUs than GPUs) can mitigate energy consumption under computational latency constraints, but typically at the cost of increased latency and reduced throughput \parencite{kakolyris_slo-aware_2024, samsi_words_2023, stojkovic_tapas_2025}. Improvements here involve movements along a throughput-power pareto frontier. 
+
+Conversely, latency arising from non-computational/communication sources such as network congestion, scheduling jitter, burstiness, or temporarily clustered and uneven query distribution, represents inefficiencies external to computation \parencite{chien_reducing_2023, stojkovic_dynamollm_2024}. Mitigation strategies such as request coalescing (under SLO-aware queuing) and workload co-location, typically improve hardware utilisation, reduce idle power draw, and increase throughput and energy efficiency \parencite{wilkins_hybrid_2024, stojkovic_dynamollm_2024, stojkovic_dynamollm_2024}. Improvements here effectively move deployments closer to the throughput-power efficiency frontier.
+
+Ultimately the latency-energy relationship is governed by a system’s position with respect to its throughput capacity. Deployed LLMs are typically throughput-efficient (i.e. on the frontier) where measured latency reflects computation bottlenecks. This typically means that in deployed settings, latency-reducing performance gains degrade energy-efficiency, introducing a further trade-off dimension between runtime- vs energy-efficiency, invisible to analytical efficiency metrics \parencite{yang_double-exponential_2024}.
+
+This study simulates communication/wait latency (whereas computational latency is inherent to the inference process across all experiments). A structured grid search pairs randomised per-request delays defined by specified min-max delay bounds, with five burst sizes (0–20 concurrent queries), and four inter-burst intervals (0–6 milliseconds). These are inserted into the forward pass using scripted delay mechanisms.
+
+\newpage

@@ -1,0 +1,48 @@
+\section{Discussion of Results}
+\label{sec:discussion_results}
+
+\subsection{Implementation Matters}
+\label{subsec:implementation_matters}
+
+Deployment decisions substantially affect inference-time energy outcomes - to an extent under-acknowledged in \textit{sustainable AI} discourse. This study shows that variation induced by implementation \textit{can} well exceed that attributable to model size alone.\footnote{Although considerable external validity concerns emphasise the \textit{`can'} element of this statement, and more robust statistical analysis is needed to delineate the conditional interaction effects.} As such, LLM energy efficiency should be conceptualised not at the level of abstract model architectures, but as a property of implemented systems shaped by concrete deployment choices.
+
+Across the full grid search, at the most extreme observed energy-per-token variation reached 516.5-fold for the LLaMa-3.2-1B model and 293.5-fold of the 3B model, reducing to 61-fold and 51-fold when considering only the 5th–95th percentiles - with coefficients of variation of 127.7\% and 123.5\% (see Figure~\ref{fig:hist_box} and Table \ref{tab:energy_stats}). However, these raw statistics include implementations associated with configurations unrealistic for practical deployment. To address this I further simulate six plausible deployment scenarios reflecting distinct real-world constraints (details in Appendix~\ref{appendix:sim_scenarios}).\footnote{I acknowledge these statistics are \textit{illustrative}, not definitive: what constitutes a ‘plausible deployment scenario’ is multifaceted and confounded in ways my limited-dimensionality configurations cannot capture. More robustly, representative weighting of the grid search results could map the experimental findings to real-world deployment distributions - here, out of scope, so these rough-and-ready figures will suffice for now.} Within these scenarios, energy efficiency outcomes ranged by 4.3-fold (CV: 61.35\%) for the 1B model, and 4.9-fold (CV: 58\%) for the 3B model. Table~\ref{tab:responses_vs_energy} further contextualises this variation at the 3B scale by comparing energy-per-query against familiar consumer electronics. 
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{} l l c c @{}}
+    \toprule
+      & & \multicolumn{2}{c}{\shortstack{\textbf{Number of equivalent}\\\textbf{300-token responses}}} \\
+    \cmidrule(lr){3-4}
+    \textbf{Appliance} & \textbf{Charge}
+      & \shortstack{\textbf{Least-efficient}\\\textbf{implementation}}
+      & \shortstack{\textbf{Most-efficient}\\\textbf{implementation}} \\
+    \midrule
+    iPhone 16                   & Full charge   &    7      &     19      \\
+    MacBook Pro (M3 2023)       & Full charge   &    40     &   116   \\
+    WiFi Router                 & 24 hr         &   64     &  186    \\
+    HD Streaming                & 1 hr          & 35      &  103    \\
+    Google Search               & 1 query       &  0.13     &    0.39        \\
+    Electric Kettle             & 1 litre boil  & 129     &   67    \\
+    Electric Shower             & 10 mins      & 663    &  1934   \\
+    \bottomrule
+  \end{tabular}
+  \caption{Number of responses to match the energy consumption of a given appliance (3B model scale). Details deriving these calculations provided in \nameref{appendix:energy_app_calcs}. For illustrative purposes only, non-definitive.}
+  \label{tab:responses_vs_energy}
+\end{table}
+
+\subsection{Parameter Effects \& Trade-offs}
+\label{subsec:param_effects_tradeoffs}
+
+While the precise mechanisms driving inference-time energy consumption are complex, this study identifies key tunable parameters: batching, tensor parallelism, and numerical precision. Even amongst this initial set, interaction effects and performance trade-offs underscore the need for joint optimisation frameworks and throughput-aware scaling. By way of example, aggressive quantisation and deterministic decoding degrade generation quality \parencite{yang_double-exponential_2024}, while larger batch sizes reduce responsiveness of real-time applications but improve efficiency (Figure~\ref{fig:per_batch_latency}) - more so for highly-distributed inference environments. Conversely, decoding strategy has minimal direct energy implications, suggesting  LLM providers can select sampling strategies on application-specific criteria rather than efficiency concerns. 
+
+\subsection{Implications for Energy Benchmarking Standards}
+\label{subsec:implications_benchmarking}
+
+Prevailing conceptualisations of LLM energy efficiency emphasise analytical over empirical measures, and model attributes over system dynamics. Early benchmarking frameworks neglect the role of implementation-level factors as necessary controls \parencite{fischer_energy_2023}. Consistent with recent recommendations \parencite{desislavov_trends_2023, luccioni_energy_2024}, this study highlights the need for direct empirical energy measurements and standardised reporting of key deployment configurations to ensure the validity and robustness of energy benchmarking practices.
+
+By way of an example to illustrate the extent of possible distortion by motivated actors at test-time, I additionally simulate an over-optimised deployment, designed to maximise throughput and minimise energy consumption without regard for practical deployment constraints (details in Appendix~\ref{appendix:sim_scenarios}). Given the strong assumption that the other configurations in this appendix reasonably represent `plausible deployments', comparing this idealised configuration to the production-like set mean tentatively indicates that unconstrained optimising for benchmark test-time can yield energy costs around 10.69\% (1B) and 13.25\% (3B) of those expected from the same model during production.\footnote{As with the illustrative figures above, these results lack rigour and are intended to demonstrate that benchmarking outcomes \textit{can} be systematically distorted in the absence of standardised implementation controls. The magnitude of these effects is likely overstated due to the validity limitations discussed below.}
+
+Finally, to assess whether \textit{ceteris paribus} FLOP-based metrics remain informative for between-model energy-efficiency comparisons (if not for whole-of-system benchmarking), the FLOPs-energy relationship conditional on identified controls, warrants further investigation. Absent such validation, energy benchmarking frameworks would benefit from normalisation with respect to throughput, a metric already routinely monitored in industry for SLO compliance, that captures both model-intrinsic computational characteristics and extrinsic implementation decisions -  and when jointly considered alongside device-utilisation, offers comprehensive insight into the inference-time efficiency of a deployed system.
+
+\newpage
