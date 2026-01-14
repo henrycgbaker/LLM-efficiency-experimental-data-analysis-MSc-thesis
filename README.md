@@ -1,5 +1,7 @@
 # LLM Efficiency Measurement: Thesis Analysis
 
+[![Read the Thesis](https://img.shields.io/badge/📄_Read_Thesis-PDF-blue?style=for-the-badge)](thesis/henry_baker_thesis.pdf)
+
 This repository contains the complete thesis, analysis scripts, and experimental data for my MDS thesis on LLM energy efficiency measurement.
 
 ## Repository Structure
