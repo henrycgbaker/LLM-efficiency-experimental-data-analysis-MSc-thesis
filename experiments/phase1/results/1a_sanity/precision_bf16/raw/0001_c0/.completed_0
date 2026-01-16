@@ -1,0 +1,7 @@
+{
+  "process_index": 0,
+  "gpu_id": 0,
+  "result_path": "/app/results/precision_bf16/raw/0001_c0/process_0.json",
+  "timestamp": "2026-01-16T19:46:32.624736",
+  "result_hash": "sha256:92c8c755ff957a83"
+}

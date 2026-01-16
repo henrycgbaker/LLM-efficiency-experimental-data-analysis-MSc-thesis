@@ -1,0 +1,32 @@
+# Phase 1a: Temperature = 0 (greedy)
+config_name: sanity_temp_0
+model_name: meta-llama/Llama-3.2-1B
+
+max_input_tokens: 128
+max_output_tokens: 128
+num_input_prompts: 32
+
+gpus: [0]
+num_processes: 1
+num_cycles: 2
+
+fp_precision: float16
+
+batching:
+  batch_size: 8
+  strategy: static
+
+decoder:
+  temperature: 0.0
+  do_sample: false
+  top_k: 50
+  top_p: 1.0
+
+quantization:
+  quantization: false
+
+prompts:
+  type: huggingface
+  dataset: ai-energy-score
+  split: train
+  sample_size: 32

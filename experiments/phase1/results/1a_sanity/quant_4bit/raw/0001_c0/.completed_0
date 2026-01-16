@@ -1,0 +1,7 @@
+{
+  "process_index": 0,
+  "gpu_id": 0,
+  "result_path": "/app/results/quant_4bit/raw/0001_c0/process_0.json",
+  "timestamp": "2026-01-16T19:49:56.137837",
+  "result_hash": "sha256:892a2e128d899118"
+}

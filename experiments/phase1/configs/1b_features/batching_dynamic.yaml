@@ -1,0 +1,30 @@
+# Phase 1b.3: Batching strategies - Dynamic
+config_name: feature_batching_dynamic
+model_name: meta-llama/Llama-3.2-1B
+
+max_input_tokens: 128
+max_output_tokens: 128
+num_input_prompts: 128
+
+gpus: [0]
+num_processes: 1
+num_cycles: 3
+
+fp_precision: float16
+
+batching:
+  batch_size: 16
+  strategy: dynamic
+  max_tokens_per_batch: 2048
+
+decoder:
+  preset: deterministic
+
+quantization:
+  quantization: false
+
+prompts:
+  type: huggingface
+  dataset: ai-energy-score
+  split: train
+  sample_size: 128

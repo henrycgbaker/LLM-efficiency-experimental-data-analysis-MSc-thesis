@@ -1,0 +1,33 @@
+# Phase 1c: Parallelism - vLLM Tensor Parallel 4 GPU
+config_name: parallel_vllm_tp_4gpu
+model_name: meta-llama/Llama-3.2-3B
+backend: vllm
+
+max_input_tokens: 128
+max_output_tokens: 128
+num_input_prompts: 128
+
+gpus: [0, 1, 2, 3]
+num_processes: 4
+num_cycles: 6  # 1 warm-up + 5 measurement
+
+batching:
+  batch_size: 8
+  strategy: static
+
+decoder:
+  preset: deterministic
+
+sharding:
+  strategy: tensor_parallel
+  num_shards: 4
+
+vllm:
+  gpu_memory_utilization: 0.9
+  max_num_seqs: 256
+
+prompts:
+  type: huggingface
+  dataset: ai-energy-score
+  split: train
+  sample_size: 128
